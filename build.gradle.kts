@@ -48,7 +48,7 @@ dependencies {
     implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.12")
 
     // JSON parsing - updated version
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
 
     // YouTube search and download capabilities
     implementation("org.json:json:20240303")
