@@ -26,18 +26,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import xyz.malefic.compose.util.DownloadManager
-import xyz.malefic.compose.util.MusicManager
 import xyz.malefic.compose.util.SearchResult
 import xyz.malefic.compose.util.YtDlpNotInstalledException
-import java.awt.image.BufferedImage
 import java.io.ByteArrayInputStream
 import javax.imageio.ImageIO
 
 @Composable
-fun SearchDownloadScreen(
-    musicManager: MusicManager,
-    onTrackDownloaded: () -> Unit,
-) {
+fun SearchDownloadScreen(onTrackDownloaded: () -> Unit) {
     val downloadManager = remember { DownloadManager() }
     val scope = rememberCoroutineScope()
 

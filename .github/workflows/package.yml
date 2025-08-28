@@ -205,7 +205,7 @@ jobs:
       - name: Upload package as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ComposeDesktopTemplate-${{ matrix.packageType }}
+          name: MusicPlayer-${{ matrix.packageType }}
           path: build/compose/binaries/main/${{ matrix.packageType }}/*
 
   # Package job for manual releases
@@ -251,7 +251,7 @@ jobs:
       - name: Upload package as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ComposeDesktopTemplate-${{ matrix.packageType }}
+          name: MusicPlayer-${{ matrix.packageType }}
           path: build/compose/binaries/main/${{ matrix.packageType }}/*
 
   # Create pre-release job - creates pre-releases for pushes to main
@@ -270,7 +270,7 @@ jobs:
       - name: Create Pre-release
         uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/ComposeDesktopTemplate-*/**/*
+          files: artifacts/MusicPlayer-*/**/*
           name: "Development Build"
           tag_name: "dev-${{ github.run_number }}"
           prerelease: true
@@ -304,7 +304,7 @@ jobs:
       - name: Create Full Release
         uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/ComposeDesktopTemplate-*/**/*
+          files: artifacts/MusicPlayer-*/**/*
           name: "Release v${{ needs.increment-version.outputs.new_version }}"
           tag_name: "v${{ needs.increment-version.outputs.new_version }}"
           prerelease: false

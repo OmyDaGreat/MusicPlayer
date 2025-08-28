@@ -36,11 +36,11 @@ dependencies {
     implementation("org:jaudiotagger:2.0.3") // Use available version
     implementation("org.mp4parser:isoparser:1.9.56") // For M4A/MP4 parsing
     implementation("com.drewnoakes:metadata-extractor:2.19.0") // Additional metadata extraction
-    
+
     // Enhanced metadata support for more formats
     implementation("com.mpatric:mp3agic:0.9.1") // Alternative MP3 metadata
     implementation("org.gagravarr:vorbis-java-core:0.8") // Ogg/Vorbis metadata
-    
+
     // HTTP client for downloading - updated versions
     implementation("io.ktor:ktor-client-core:2.3.12")
     implementation("io.ktor:ktor-client-cio:2.3.12")
@@ -49,7 +49,7 @@ dependencies {
 
     // JSON parsing - updated version
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
-    
+
     // YouTube search and download capabilities
     implementation("org.json:json:20240303")
     implementation("org.jsoup:jsoup:1.17.2")
@@ -64,7 +64,7 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(Dmg, Msi, Deb)
-            packageName = "ComposeDesktopTemplate"
+            packageName = "MusicPlayer"
             packageVersion = "1.0.0"
         }
     }

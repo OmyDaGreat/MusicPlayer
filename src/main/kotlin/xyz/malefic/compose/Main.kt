@@ -174,7 +174,6 @@ fun MusicPlayerApp() {
                 ) {
                     if (showDownloader) {
                         SearchDownloadScreen(
-                            musicManager = musicManager,
                             onTrackDownloaded = {
                                 scope.launch {
                                     musicManager.scanMusicDirectory()
