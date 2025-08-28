@@ -23,6 +23,8 @@ dependencies {
     implementation(compose.desktop.currentOs)
     implementation(libs.bundles.malefic.ext)
     implementation(libs.precompose)
+    // Music player dependencies will be added later when needed
+    // implementation(libs.bundles.music.player)
 }
 
 compose.desktop {
