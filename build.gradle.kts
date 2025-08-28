@@ -25,7 +25,7 @@ dependencies {
     implementation(compose.desktop.currentOs)
     implementation(libs.bundles.malefic.ext)
     implementation(libs.precompose)
-    implementation("androidx.compose.material:material-icons-extended:1.7.7")
+    implementation("androidx.compose.material:material-icons-extended:1.7.8")
 
     // VLCJ for enhanced audio format support (Opus, M4A, etc.)
     implementation("uk.co.caprica:vlcj:4.8.2")
