@@ -37,6 +37,10 @@ dependencies {
     implementation("com.googlecode.soundlibs:tritonus-share:0.3.7.4")
     implementation("com.googlecode.soundlibs:vorbisspi:1.0.3.3") // For OGG Vorbis
     
+    // Enhanced metadata support for more formats
+    implementation("com.mpatric:mp3agic:0.9.1") // Alternative MP3 metadata
+    implementation("org.gagravarr:vorbis-java-core:0.8") // Ogg/Vorbis metadata
+    
     // HTTP client for downloading - updated versions
     implementation("io.ktor:ktor-client-core:2.3.12")
     implementation("io.ktor:ktor-client-cio:2.3.12")

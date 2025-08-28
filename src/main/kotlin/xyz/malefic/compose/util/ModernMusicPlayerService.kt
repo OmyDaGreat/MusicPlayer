@@ -137,12 +137,31 @@ class ModernMusicPlayerService {
         file: File,
         track: Track,
     ) {
-        // For unsupported formats, create a placeholder track that shows in UI
-        // In a real implementation, you could integrate with external players or converters
+        // Advanced fallback handling for unsupported formats
+        val extension = file.extension.lowercase()
+
+        when (extension) {
+            "opus" -> {
+                println("Opus format detected but not supported by Java Sound API.")
+                println("Opus files require native codec support or external conversion.")
+            }
+            "m4a", "mp4", "aac" -> {
+                println("M4A/AAC format detected but may have limited support.")
+                println("Some M4A files may require additional codecs or external conversion.")
+            }
+            else -> {
+                println("Format not supported natively: $extension. Consider using an external converter.")
+            }
+        }
+
+        // Set track as current but not playing
         _currentTrack.value = track
         _duration.value = track.duration
         _isPlaying.value = false
-        println("Format not supported natively: ${file.extension}. Consider using an external converter.")
+
+        // Show helpful message to user
+        println("Track '${track.title}' loaded but cannot be played due to format limitations.")
+        println("Supported formats: MP3, WAV, FLAC, OGG (Vorbis)")
     }
 
     suspend fun playWithPlaylist(

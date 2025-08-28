@@ -2,9 +2,12 @@ package xyz.malefic.compose
 
 import androidx.compose.desktop.ui.tooling.preview.Preview
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
@@ -38,6 +41,8 @@ fun main() =
             onCloseRequest = ::exitApplication,
             title = "Modern Kotlin Music Player",
         ) {
+            window.preferredSize = java.awt.Dimension(1200, 800)
+            window.minimumSize = java.awt.Dimension(1000, 600)
             MusicPlayerApp()
         }
     }
@@ -88,7 +93,7 @@ fun MusicPlayerApp() {
         Row(modifier = Modifier.fillMaxSize()) {
             // Sidebar - Playlists
             Card(
-                modifier = Modifier.width(250.dp).fillMaxHeight(),
+                modifier = Modifier.width(300.dp).fillMaxHeight(),
                 elevation = 4.dp,
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -110,42 +115,50 @@ fun MusicPlayerApp() {
 
                     Divider(modifier = Modifier.padding(vertical = 8.dp))
 
-                    LazyColumn {
-                        items(playlists) { playlist ->
-                            Card(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
-                                backgroundColor =
-                                    if (playlist == selectedPlaylist) {
-                                        MaterialTheme.colors.primary.copy(alpha = 0.1f)
-                                    } else {
-                                        MaterialTheme.colors.surface
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        val playlistScrollState = rememberLazyListState()
+                        LazyColumn(state = playlistScrollState) {
+                            items(playlists) { playlist ->
+                                Card(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                                    backgroundColor =
+                                        if (playlist == selectedPlaylist) {
+                                            MaterialTheme.colors.primary.copy(alpha = 0.1f)
+                                        } else {
+                                            MaterialTheme.colors.surface
+                                        },
+                                    onClick = {
+                                        selectedPlaylist = playlist
+                                        showDownloader = false
+                                        searchQuery = "" // Clear search when switching playlists
                                     },
-                                onClick = {
-                                    selectedPlaylist = playlist
-                                    showDownloader = false
-                                    searchQuery = "" // Clear search when switching playlists
-                                },
-                            ) {
-                                Column(modifier = Modifier.padding(12.dp)) {
-                                    Text(
-                                        text = playlist.name,
-                                        style = MaterialTheme.typography.body1,
-                                    )
-                                    Text(
-                                        text = "${playlist.tracks.size} songs",
-                                        style = MaterialTheme.typography.caption,
-                                        color = Color.Gray,
-                                    )
+                                ) {
+                                    Column(modifier = Modifier.padding(12.dp)) {
+                                        Text(
+                                            text = playlist.name,
+                                            style = MaterialTheme.typography.body1,
+                                        )
+                                        Text(
+                                            text = "${playlist.tracks.size} songs",
+                                            style = MaterialTheme.typography.caption,
+                                            color = Color.Gray,
+                                        )
+                                    }
                                 }
                             }
                         }
+
+                        VerticalScrollbar(
+                            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+                            adapter = rememberScrollbarAdapter(scrollState = playlistScrollState),
+                        )
                     }
                 }
             }
 
             // Main Content
             Column(
-                modifier = Modifier.weight(1f).fillMaxHeight().padding(16.dp),
+                modifier = Modifier.weight(1f).fillMaxHeight().padding(20.dp),
             ) {
                 if (showDownloader) {
                     SearchDownloadScreen(
@@ -163,7 +176,7 @@ fun MusicPlayerApp() {
                         OutlinedTextField(
                             value = searchQuery,
                             onValueChange = { searchQuery = it },
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
                             placeholder = { Text("Search music...") },
                             leadingIcon = { Icon(Icons.Default.Search, "Search") },
                             trailingIcon = {
@@ -389,14 +402,22 @@ fun PlaylistView(
                 }
             }
         } else {
-            LazyColumn {
-                items(tracksToDisplay) { track ->
-                    TrackItem(
-                        track = track,
-                        isCurrentTrack = track == currentTrack,
-                        onClick = { onTrackSelected(track) },
-                    )
+            val trackListState = rememberLazyListState()
+            Box(modifier = Modifier.fillMaxSize()) {
+                LazyColumn(state = trackListState) {
+                    items(tracksToDisplay) { track ->
+                        TrackItem(
+                            track = track,
+                            isCurrentTrack = track == currentTrack,
+                            onClick = { onTrackSelected(track) },
+                        )
+                    }
                 }
+
+                VerticalScrollbar(
+                    modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+                    adapter = rememberScrollbarAdapter(scrollState = trackListState),
+                )
             }
         }
     }
@@ -410,7 +431,7 @@ fun TrackItem(
     onClick: () -> Unit,
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         backgroundColor =
             if (isCurrentTrack) {
                 MaterialTheme.colors.primary.copy(alpha = 0.1f)
@@ -420,7 +441,7 @@ fun TrackItem(
         onClick = onClick,
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // Album artwork or music note icon
@@ -433,13 +454,13 @@ fun TrackItem(
                     Image(
                         bitmap = artwork,
                         contentDescription = "Album Art",
-                        modifier = Modifier.size(48.dp).clip(RoundedCornerShape(4.dp)),
+                        modifier = Modifier.size(56.dp).clip(RoundedCornerShape(6.dp)),
                     )
                 } else {
                     Icon(
                         Icons.Default.MusicNote,
                         contentDescription = "Track",
-                        modifier = Modifier.size(48.dp),
+                        modifier = Modifier.size(56.dp),
                         tint = if (isCurrentTrack) MaterialTheme.colors.primary else Color.Gray,
                     )
                 }
@@ -447,12 +468,12 @@ fun TrackItem(
                 Icon(
                     Icons.Default.MusicNote,
                     contentDescription = "Track",
-                    modifier = Modifier.size(48.dp),
+                    modifier = Modifier.size(56.dp),
                     tint = if (isCurrentTrack) MaterialTheme.colors.primary else Color.Gray,
                 )
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(16.dp))
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -517,10 +538,10 @@ fun PlayerControls(
     onRepeatToggle: () -> Unit,
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().height(200.dp),
         elevation = 8.dp,
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(20.dp)) {
             currentTrack?.let { track ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -536,13 +557,13 @@ fun PlayerControls(
                             Image(
                                 bitmap = artwork,
                                 contentDescription = "Album Art",
-                                modifier = Modifier.size(64.dp).clip(RoundedCornerShape(8.dp)),
+                                modifier = Modifier.size(80.dp).clip(RoundedCornerShape(8.dp)),
                             )
                         } else {
                             Icon(
                                 Icons.Default.MusicNote,
                                 contentDescription = "Track",
-                                modifier = Modifier.size(64.dp),
+                                modifier = Modifier.size(80.dp),
                                 tint = MaterialTheme.colors.primary,
                             )
                         }
@@ -550,12 +571,12 @@ fun PlayerControls(
                         Icon(
                             Icons.Default.MusicNote,
                             contentDescription = "Track",
-                            modifier = Modifier.size(64.dp),
+                            modifier = Modifier.size(80.dp),
                             tint = MaterialTheme.colors.primary,
                         )
                     }
 
-                    Spacer(modifier = Modifier.width(16.dp))
+                    Spacer(modifier = Modifier.width(20.dp))
 
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
@@ -584,7 +605,7 @@ fun PlayerControls(
                 }
 
                 if (duration > 0) {
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
                     // Seekable progress bar
                     var seekPosition by remember { mutableStateOf(currentPosition) }
@@ -619,7 +640,7 @@ fun PlayerControls(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
             }
 
             // Main Controls Row
@@ -629,43 +650,81 @@ fun PlayerControls(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 // Shuffle button
-                IconButton(onClick = onShuffleToggle) {
+                IconButton(
+                    onClick = onShuffleToggle,
+                    modifier = Modifier.size(48.dp),
+                ) {
                     Icon(
                         Icons.Default.Shuffle,
                         "Shuffle",
                         tint = if (isShuffleEnabled) MaterialTheme.colors.primary else Color.Gray,
+                        modifier = Modifier.size(28.dp),
                     )
                 }
 
-                IconButton(onClick = onPrevious) {
-                    Icon(Icons.Default.SkipPrevious, "Previous")
+                Spacer(modifier = Modifier.width(16.dp))
+
+                IconButton(
+                    onClick = onPrevious,
+                    modifier = Modifier.size(48.dp),
+                ) {
+                    Icon(
+                        Icons.Default.SkipPrevious,
+                        "Previous",
+                        modifier = Modifier.size(32.dp),
+                    )
                 }
 
-                IconButton(onClick = onPlayPause) {
+                Spacer(modifier = Modifier.width(8.dp))
+
+                IconButton(
+                    onClick = onPlayPause,
+                    modifier = Modifier.size(56.dp),
+                ) {
                     Icon(
                         if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                         if (isPlaying) "Pause" else "Play",
+                        modifier = Modifier.size(40.dp),
                     )
                 }
 
-                IconButton(onClick = onNext) {
-                    Icon(Icons.Default.SkipNext, "Next")
+                Spacer(modifier = Modifier.width(8.dp))
+
+                IconButton(
+                    onClick = onNext,
+                    modifier = Modifier.size(48.dp),
+                ) {
+                    Icon(
+                        Icons.Default.SkipNext,
+                        "Next",
+                        modifier = Modifier.size(32.dp),
+                    )
                 }
 
+                Spacer(modifier = Modifier.width(16.dp))
+
                 // Repeat button
-                IconButton(onClick = onRepeatToggle) {
+                IconButton(
+                    onClick = onRepeatToggle,
+                    modifier = Modifier.size(48.dp),
+                ) {
                     val (icon, tint) =
                         when (repeatMode) {
                             RepeatMode.OFF -> Icons.Default.Repeat to Color.Gray
                             RepeatMode.ALL -> Icons.Default.Repeat to MaterialTheme.colors.primary
                             RepeatMode.ONE -> Icons.Default.RepeatOne to MaterialTheme.colors.primary
                         }
-                    Icon(icon, "Repeat", tint = tint)
+                    Icon(
+                        icon,
+                        "Repeat",
+                        tint = tint,
+                        modifier = Modifier.size(28.dp),
+                    )
                 }
             }
 
             // Volume Control
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -673,18 +732,18 @@ fun PlayerControls(
                 Icon(
                     Icons.Default.VolumeDown,
                     contentDescription = "Volume",
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(24.dp),
                 )
                 Slider(
                     value = volume,
                     onValueChange = onVolumeChanged,
-                    modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                    modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
                     valueRange = 0f..1f,
                 )
                 Icon(
                     Icons.Default.VolumeUp,
                     contentDescription = "Volume",
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(24.dp),
                 )
             }
         }

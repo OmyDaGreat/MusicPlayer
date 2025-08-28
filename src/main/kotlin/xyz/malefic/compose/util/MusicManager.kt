@@ -112,6 +112,7 @@ class MusicManager {
 
     private fun extractEnhancedMetadata(file: File): Track =
         try {
+            // First try with JAudioTagger
             val audioFile = AudioFileIO.read(file)
             val tag = audioFile.tag
             val header = audioFile.audioHeader
@@ -180,11 +181,53 @@ class MusicManager {
             )
         } catch (e: Exception) {
             println("Enhanced metadata extraction failed for ${file.name}: ${e.message}")
-            // Fallback to basic file information
+
+            // Special handling for different formats
+            when (file.extension.lowercase()) {
+                "opus" -> {
+                    println("Attempting fallback metadata extraction for Opus file")
+                    extractOpusFallbackMetadata(file)
+                }
+                "m4a", "mp4", "aac" -> {
+                    println("Attempting fallback metadata extraction for M4A/AAC file")
+                    extractM4AFallbackMetadata(file)
+                }
+                else -> {
+                    createFallbackTrack(file)
+                }
+            }
+        }
+
+    private fun extractOpusFallbackMetadata(file: File): Track {
+        // For opus files, try to extract basic info from filename
+        // In a production app, you might use specialized opus libraries
+        return try {
+            // Try to parse filename patterns like "Artist - Title.opus"
+            val nameWithoutExt = file.nameWithoutExtension
+            val parts = nameWithoutExt.split(" - ", limit = 2)
+
+            val artist: String
+            val title: String
+            when {
+                parts.size >= 2 -> {
+                    artist = parts[1]
+                    title = parts[0] // "Title - Artist" format
+                }
+                nameWithoutExt.contains(" by ") -> {
+                    val byParts = nameWithoutExt.split(" by ", limit = 2)
+                    title = byParts[0]
+                    artist = byParts.getOrNull(1) ?: "Unknown Artist"
+                }
+                else -> {
+                    title = nameWithoutExt
+                    artist = "Unknown Artist"
+                }
+            }
+
             Track(
                 id = UUID.randomUUID().toString(),
-                title = file.nameWithoutExtension,
-                artist = "Unknown Artist",
+                title = title,
+                artist = artist,
                 album = "Unknown Album",
                 filePath = file.absolutePath,
                 duration = 0L,
@@ -193,7 +236,65 @@ class MusicManager {
                 trackNumber = 0,
                 artworkPath = null,
             )
+        } catch (e: Exception) {
+            createFallbackTrack(file)
         }
+    }
+
+    private fun extractM4AFallbackMetadata(file: File): Track {
+        // For M4A files, similar filename parsing approach
+        return try {
+            val nameWithoutExt = file.nameWithoutExtension
+            val parts = nameWithoutExt.split(" - ", limit = 2)
+
+            val artist: String
+            val title: String
+            when {
+                parts.size >= 2 -> {
+                    artist = parts[1]
+                    title = parts[0]
+                }
+                nameWithoutExt.contains(" by ") -> {
+                    val byParts = nameWithoutExt.split(" by ", limit = 2)
+                    title = byParts[0]
+                    artist = byParts.getOrNull(1) ?: "Unknown Artist"
+                }
+                else -> {
+                    title = nameWithoutExt
+                    artist = "Unknown Artist"
+                }
+            }
+
+            Track(
+                id = UUID.randomUUID().toString(),
+                title = title,
+                artist = artist,
+                album = "Unknown Album",
+                filePath = file.absolutePath,
+                duration = 0L,
+                year = "",
+                genre = "",
+                trackNumber = 0,
+                artworkPath = null,
+            )
+        } catch (e: Exception) {
+            createFallbackTrack(file)
+        }
+    }
+
+    private fun createFallbackTrack(file: File): Track =
+        Track(
+            id = UUID.randomUUID().toString(),
+            title = file.nameWithoutExtension,
+            artist = "Unknown Artist",
+            album = "Unknown Album",
+            filePath = file.absolutePath,
+            duration = 0L,
+            year = "",
+            genre = "",
+            trackNumber = 0,
+            artworkPath = null,
+        )
 
     private fun extractAlbumArtwork(
         audioFile: File,
