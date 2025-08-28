@@ -1,21 +1,54 @@
-= Compose Desktop Template
+= MusicPlayer - Advanced Desktop Music Player
 :toc: left
 :toclevels: 3
 :icons: font
 :source-highlighter: highlightjs
 
-A template project for creating desktop applications using Jetbrains Compose for Desktop with a focus on simplicity and productivity.
+A comprehensive desktop music player built with Jetbrains Compose for Desktop, featuring modern audio playback, playlist management, and music downloading capabilities.
 
 image::homepage.png[Basic Homepage created with this template]
 
 == Overview
 
-This template provides a starting point for building desktop applications using Compose for Desktop. It includes:
+This application is a full-featured music player that provides:
 
-* Navigation system with route configuration
-* Theming support with light and dark modes
-* Custom UI components and extensions
-* DSL-like syntax for building UIs
+* **Multi-format Audio Support**: MP3, WAV, FLAC, AU, AIFF, OGG, Opus, M4A, AAC, WMA
+* **Advanced Playback Features**: Volume control, shuffle, repeat modes (off/all/one)
+* **Comprehensive Playlist System**: Create, edit, manage multiple playlists
+* **Music Discovery**: YouTube search and download integration
+* **Enhanced Metadata**: Complete track information extraction with fallbacks
+* **Modern UI**: Clean, responsive interface with intuitive controls
+
+== Features
+
+=== Audio Playback
+* Support for 10+ audio formats including modern Opus and M4A
+* Volume control with real-time adjustment
+* Shuffle and repeat modes (off, all tracks, single track)
+* Automatic track progression with smart repeat handling
+* Enhanced metadata extraction with multiple fallback sources
+
+=== Playlist Management
+* Create unlimited custom playlists
+* Add/remove tracks from playlists
+* Reorder tracks within playlists
+* Rename, duplicate, and clear playlists
+* Protected default playlists ("All Music", "Favorites")
+* Real-time playlist statistics
+
+=== Music Discovery & Download
+* YouTube search integration
+* Parse and extract track information from search results
+* Download framework (extensible for yt-dlp integration)
+* Automatic integration with music library
+* Direct URL download support
+
+=== User Interface
+* Clean, modern Material Design interface
+* Responsive layout with sidebar playlist navigation
+* Enhanced player controls with progress indication
+* Search and download interface
+* Real-time status updates and notifications
 
 == Libraries
 
@@ -24,8 +57,32 @@ This template provides a starting point for building desktop applications using 
 [cols="1,1,2", options="header"]
 |===
 |Library |Version |Purpose
-|Compose for Desktop |1.8.0-rc01 |UI toolkit for building desktop applications with Kotlin
-|Kotlin JVM |2.1.20 |Kotlin programming language for JVM
+|Compose for Desktop |1.8.2 |UI toolkit for building desktop applications with Kotlin
+|Kotlin JVM |2.2.10 |Kotlin programming language for JVM
+|Kotlinx Coroutines |1.8.1 |Asynchronous programming support
+|===
+
+=== Audio Libraries
+
+[cols="1,1,2", options="header"]
+|===
+|Library |Version |Purpose
+|BasicPlayer |3.0.0.0 |Core audio playback engine
+|MP3SPI |1.9.5.4 |MP3 format support
+|VorbisSPI |1.0.3.3 |OGG Vorbis format support
+|JAudioTagger |2.0.3 |Audio metadata extraction
+|ISOParser |1.9.56 |M4A/MP4 metadata parsing
+|===
+
+=== Network & Serialization
+
+[cols="1,1,2", options="header"]
+|===
+|Library |Version |Purpose
+|Ktor Client |2.3.12 |HTTP client for downloads and API calls
+|Kotlinx Serialization |1.6.3 |JSON serialization for playlists
+|JSoup |1.17.2 |HTML parsing for YouTube search
+|JSON |20240303 |JSON parsing utilities
 |===
 
 === Navigation and Routing
@@ -64,160 +121,245 @@ This template provides a starting point for building desktop applications using 
 |Kotlinter |5.0.2 |Kotlin linting and formatting tool
 |===
 
-== Basic Functionality
-
-=== Navigation System
-
-The template includes a navigation system that allows you to:
-
-* Define routes in a configuration file (`routes.mcf`)
-* Navigate between screens with parameters
-* Use a sidebar for navigation
-
-Example route configuration:
-[source,text]
-----
-routes:
-  home* -> Home
-  app1 -> App1? [id, name?]
-  hidden -> Text? [text?]
-----
-
-=== Theming
-
-The template supports both light and dark themes:
-
-* Theme files are defined in JSON format
-* System theme detection is supported
-* Material Design color system is used
-
-=== UI Building
-
-The template provides a DSL-like syntax for building UIs:
-
-* Factory classes for common UI elements (Row, Column, Button, Text)
-* Custom operators for applying modifiers and styles
-* Utility functions for common tasks
-
-Example:
-[source,kotlin]
-----
-ColumnFactory {
-    ButtonFactory { TextFactory(text)() } / {
-        onClick = { text = text.either("Hello, World!", "Hello, Desktop!") }
-    } *= {
-        space(16.dp)
-    }
-}
-----
-
-== Getting Started
+== Installation & Usage
 
 === Prerequisites
 
-* JDK 11 or higher
-* Gradle 7.0 or higher
+* JDK 17 or higher
+* Gradle 9.0 or higher
+* At least 512MB RAM
+* Sound system support (ALSA, PulseAudio, etc.)
 
 === Running the Application
 
 1. Clone the repository
-2. Open the project in your IDE (IntelliJ IDEA recommended)
-3. Run `./gradlew desktop`
++
+[source,bash]
+----
+git clone https://github.com/OmyDaGreat/MusicPlayer.git
+cd MusicPlayer
+----
 
-=== Building the Application
+2. Make gradlew executable (Linux/macOS)
++
+[source,bash]
+----
+chmod +x gradlew
+----
 
-==== Local Building
+3. Run the application
++
+[source,bash]
+----
+./gradlew runDistributable
+----
 
-To build a distributable package locally:
+=== Building Distribution Packages
+
+To build platform-specific distribution packages:
 
 [source,bash]
 ----
 ./gradlew packageDistributionForCurrentOS
 ----
 
-This will create a platform-specific package (DMG for macOS, MSI for Windows, DEB for Linux).
+This creates packages in `build/compose/binaries/main/`:
+* **Windows**: MSI installer
+* **macOS**: DMG disk image  
+* **Linux**: DEB package
 
-==== Automated Building with GitHub Actions
+== User Guide
 
-The project includes a GitHub Actions workflow that automatically builds and packages the application:
+=== Getting Started
 
-* Builds are triggered on pushes to the main branch and pull requests
-* Pre-releases are automatically created for every push to the main branch
-* Full releases can be created manually with version incrementing
-* Packages are built for all platforms (Windows, macOS, Linux)
-* All packages use the standard (non-release) distribution for better compatibility
+1. **First Launch**: The application creates a `~/Music` directory and initializes default playlists
+2. **Add Music**: Place audio files in `~/Music` or use the search & download feature
+3. **Scan Library**: Click the refresh button to scan for new music files
+4. **Create Playlists**: Use the + button in the sidebar to create custom playlists
 
-===== Automatic Pre-releases
+=== Playing Music
 
-Every push to the main branch automatically creates a pre-release with:
+* **Select Playlist**: Click on any playlist in the sidebar
+* **Play Track**: Double-click any track in the main view
+* **Control Playback**: Use the bottom player controls
+* **Adjust Volume**: Use the volume slider in the player controls
+* **Shuffle/Repeat**: Toggle shuffle and repeat modes with the respective buttons
 
-* A "dev-X" tag (where X is the build number)
-* Packages for all platforms
-* Detailed information about the build
-* Pre-release flag to indicate it's not a stable release
+=== Playlist Management
 
-===== Manual Full Releases
+* **Create**: Click + button in sidebar, enter playlist name
+* **Rename**: Right-click playlist → Rename (for custom playlists)
+* **Add Tracks**: Drag tracks from "All Music" to custom playlists
+* **Remove Tracks**: Right-click track in playlist → Remove
+* **Reorder**: Drag tracks to reorder within playlists
 
-To create a full release with version incrementing:
+=== Search & Download
 
-1. Go to the "Actions" tab in the GitHub repository
-2. Select the "Package Compose Desktop Application" workflow
-3. Click "Run workflow"
-4. Choose the release type:
-   * `patch` - Increases the third number (e.g., 1.0.0 → 1.0.1)
-   * `minor` - Increases the second number and resets the third (e.g., 1.0.0 → 1.1.0)
-   * `major` - Increases the first number and resets the others (e.g., 1.0.0 → 2.0.0)
-5. Click "Run workflow"
+1. Click the download icon in the sidebar to open search interface
+2. Enter search terms (e.g., "Artist - Song Title")
+3. Browse search results from YouTube
+4. Click download button next to desired tracks
+5. Downloaded tracks automatically appear in "All Music" playlist
 
-The workflow will:
+*Note*: Current implementation provides search framework. For full YouTube download functionality, integrate with yt-dlp.
 
-1. Increment the version in build.gradle.kts
-2. Commit and push the changes
-3. Create a new tag with the version number
-4. Build packages for all platforms
-5. Create a GitHub release with the packages attached
+=== Supported Audio Formats
 
-== Project Structure
-
-[source]
-----
-ComposeDesktopTemplate/
-├── .github/
-│   └── workflows/
-│       └── package.yml        # GitHub Actions workflow for packaging
-├── build.gradle.kts           # Gradle build configuration
-├── gradle/
-│   └── libs.versions.toml     # Library versions and bundles
-├── src/
-│   └── main/
-│       ├── kotlin/
-│       │   └── xyz/malefic/compose/
-│       │       ├── Main.kt    # Application entry point
-│       │       └── screens/   # Screen composables
-│       └── resources/
-│           ├── routes.mcf     # Route configuration
-│           └── theme/         # Theme JSON files
-└── README.adoc                # This file
-----
+The application supports these audio formats:
+* **Lossless**: FLAC, WAV, AU, AIFF
+* **Compressed**: MP3, OGG Vorbis, Opus, M4A, AAC, WMA
 
 == Configuration
 
-=== Routes
+=== Music Directory
 
-Routes are configured in the `routes.mcf` file:
+By default, music is stored in `~/Music`. The application creates:
+* `~/Music/` - Main music library
+* `~/Music/Downloads/` - Downloaded tracks
+* `~/Music/playlists.json` - Playlist configuration
 
-* `*` indicates the default route
-* `?` after a parameter name indicates it's optional
-* `?` after a route name indicates it is not shown in the sidebar, though this only matters when the RoutedSidebar is used (not recommended)
+=== Default Playlists
 
-=== Themes
+* **All Music**: Contains all scanned tracks (read-only)
+* **Favorites**: For your favorite tracks
+* **Custom Playlists**: User-created playlists
 
-Themes are configured in JSON files:
+== Development
 
-* `dark.json` - Dark theme colors
-* `light.json` - Light theme colors
+=== Project Structure
 
-The application automatically selects the theme based on the system's theme.
+[source]
+----
+MusicPlayer/
+├── build.gradle.kts           # Build configuration
+├── src/main/kotlin/xyz/malefic/compose/
+│   ├── Main.kt               # Application entry point
+│   ├── screens/              # UI screens
+│   │   └── SearchDownloadScreen.kt
+│   └── util/                 # Core utilities
+│       ├── MusicManager.kt   # Music library management
+│       ├── MusicPlayerService.kt # Audio playback service
+│       ├── DownloadManager.kt # Download & search functionality
+│       └── Data.kt           # Data models
+└── README.adoc               # This file
+----
 
-== LICENSE
+=== Building from Source
+
+1. **Setup Development Environment**
++
+[source,bash]
+----
+git clone https://github.com/OmyDaGreat/MusicPlayer.git
+cd MusicPlayer
+./gradlew build
+----
+
+2. **Code Style**
++
+[source,bash]
+----
+./gradlew formatKotlin    # Format code
+./gradlew lintKotlin      # Check code style
+----
+
+3. **Testing**
++
+[source,bash]
+----
+./gradlew test           # Run tests
+----
+
+== Advanced Features
+
+=== Extending Download Functionality
+
+The current download system provides a framework for integration with external tools:
+
+[source,kotlin]
+----
+// Example: Integrate with yt-dlp for full YouTube download support
+class YTDLPDownloadManager : DownloadManager() {
+    suspend fun downloadWithYTDLP(videoId: String): Track {
+        // Implementation using yt-dlp process
+        // Download audio, extract metadata, create Track object
+    }
+}
+----
+
+=== Custom Audio Format Support
+
+To add support for additional audio formats:
+
+1. Add the extension to `audioExtensions` in `MusicManager.kt`
+2. Ensure the audio library supports the format
+3. Update metadata extraction if needed
+
+=== Plugin Architecture
+
+The modular design allows for easy extension:
+* `MusicPlayerService` - Swap audio backends
+* `DownloadManager` - Add new download sources
+* `MusicManager` - Customize library management
+* UI screens - Add new functionality panels
+
+== Troubleshooting
+
+=== Common Issues
+
+**Application won't start**
+- Ensure JDK 17+ is installed
+- Check that audio system is working
+- Verify permissions to ~/Music directory
+
+**Audio playback issues**
+- Check supported format (see supported formats list)
+- Verify file isn't corrupted
+- Ensure audio drivers are working
+
+**Search not working**
+- Check internet connection
+- YouTube search uses web scraping (may break with site changes)
+- Consider implementing yt-dlp integration for reliability
+
+**Missing metadata**
+- Some formats may have limited metadata support
+- Files downloaded from internet may lack proper tags
+- Use music management software to add metadata
+
+=== Performance Tips
+
+* Keep music library under 10,000 tracks for optimal performance
+* Use FLAC for archival, MP3/OGG for daily listening
+* Regular cleanup of download folder
+* Close other audio applications to avoid conflicts
+
+== Contributing
+
+Contributions are welcome! Please:
+
+1. Fork the repository
+2. Create a feature branch
+3. Follow the existing code style (use `./gradlew formatKotlin`)
+4. Add tests for new functionality
+5. Submit a pull request
+
+=== Development Guidelines
+
+* Use Kotlin coroutines for async operations
+* Follow Material Design principles for UI
+* Maintain compatibility with existing playlists
+* Document new features in README
+* Add error handling for user-facing features
+
+== License
+
 This project is licensed under the MIT License. See the link:LICENSE[LICENSE] file for more details.
+
+== Acknowledgments
+
+* Jetbrains Compose for Desktop framework
+* BasicPlayer and associated audio libraries
+* JAudioTagger for metadata extraction
+* Ktor for HTTP client functionality
+* All contributors and testers
