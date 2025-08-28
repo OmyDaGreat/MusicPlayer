@@ -55,7 +55,17 @@ fun MusicPlayerApp() {
     val musicPlayer = remember { ModernMusicPlayerService() }
     val scope = rememberCoroutineScope()
 
+    // Sync currentTrack with musicPlayer's current track
+    val musicPlayerCurrentTrack by musicPlayer.currentTrack
     var currentTrack by remember { mutableStateOf<Track?>(null) }
+
+    // Update currentTrack whenever the music player's track changes
+    LaunchedEffect(musicPlayerCurrentTrack) {
+        if (musicPlayerCurrentTrack != currentTrack) {
+            currentTrack = musicPlayerCurrentTrack
+        }
+    }
+
     val isPlaying by musicPlayer.isPlaying
     val currentPosition by musicPlayer.currentPosition
     val duration by musicPlayer.duration

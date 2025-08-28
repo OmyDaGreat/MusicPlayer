@@ -160,27 +160,26 @@ class DownloadManager {
     suspend fun downloadFromYouTube(searchResult: SearchResult): Track =
         withContext(Dispatchers.IO) {
             try {
-                // Prefer opus and m4a formats over mp3
-                val preferredFormats = listOf("opus", "m4a", "aac", "mp3")
-                val selectedFormat = preferredFormats.first() // Default to opus for best quality
+                // Use MP3 format for reliable downloads
+                val format = "mp3"
 
-                // Note: In a real implementation, you would use yt-dlp or similar tool
-                // For now, we'll create a placeholder that could be extended
                 // Use "Title - Artist" format to match the parsing logic in MusicManager
                 val fileName = "${searchResult.title} - ${searchResult.artist}".replace("[^a-zA-Z0-9 .-]".toRegex(), "")
-                val safeFileName = "$fileName.$selectedFormat"
+                val safeFileName = "$fileName.$format"
                 val file = File(musicManager.downloadsDirectory, safeFileName)
 
                 // Download thumbnail as artwork first
                 val artworkPath = downloadThumbnail(searchResult)
 
-                // Use yt-dlp to download actual audio file
-                val success = downloadWithYtDlp(file, searchResult, selectedFormat)
+                // Try to download with yt-dlp first, fall back to placeholder
+                val success = downloadWithYtDlp(file, searchResult, format)
 
                 if (!success) {
-                    // If yt-dlp fails, create a placeholder but mark it clearly
-                    file.writeText("# Placeholder for YouTube download: ${searchResult.videoId}\n# yt-dlp not available or download failed")
-                    println("yt-dlp download failed for ${searchResult.title}, created placeholder file")
+                    // Create placeholder file for compatibility
+                    file.writeText(
+                        "# Placeholder for YouTube download: ${searchResult.videoId}\n# Audio would be downloaded from: https://youtube.com/watch?v=${searchResult.videoId}\n# Format: MP3",
+                    )
+                    println("Created placeholder file for ${searchResult.title} - real download not available")
                 }
 
                 val track =
@@ -216,11 +215,21 @@ class DownloadManager {
                 ytDlpCheck.waitFor()
 
                 if (ytDlpCheck.exitValue() != 0) {
-                    println("yt-dlp not found in PATH")
-                    return@withContext false
+                    println("yt-dlp not found in PATH, trying youtube-dl")
+
+                    // Try youtube-dl as fallback
+                    val youtubeDlCheck = ProcessBuilder("youtube-dl", "--version").start()
+                    youtubeDlCheck.waitFor()
+
+                    if (youtubeDlCheck.exitValue() != 0) {
+                        println("Neither yt-dlp nor youtube-dl found in PATH")
+                        return@withContext false
+                    }
+
+                    return@withContext downloadWithYoutubeDl(outputFile, searchResult, format)
                 }
 
-                // Create the download command
+                // Create the download command for yt-dlp
                 val url = "https://youtube.com/watch?v=${searchResult.videoId}"
                 val outputTemplate = outputFile.absolutePath.removeSuffix(".${outputFile.extension}")
 
@@ -237,11 +246,10 @@ class DownloadManager {
                         "--output",
                         "$outputTemplate.%(ext)s",
                         "--no-playlist",
-                        "--prefer-free-formats",
                         url,
                     )
 
-                println("Downloading ${searchResult.title} by ${searchResult.artist}...")
+                println("Downloading ${searchResult.title} by ${searchResult.artist} as MP3...")
                 println("Command: ${command.joinToString(" ")}")
 
                 val process =
@@ -260,7 +268,7 @@ class DownloadManager {
                         outputFile.parentFile.listFiles { _, name ->
                             name.startsWith(outputFile.nameWithoutExtension) &&
                                 name != outputFile.name &&
-                                (name.endsWith(".opus") || name.endsWith(".m4a") || name.endsWith(".mp3") || name.endsWith(".aac"))
+                                name.endsWith(".mp3")
                         }
 
                     if (downloadedFiles?.isNotEmpty() == true) {
@@ -279,6 +287,70 @@ class DownloadManager {
                 false
             } catch (e: Exception) {
                 println("Error running yt-dlp: ${e.message}")
+                false
+            }
+        }
+
+    private suspend fun downloadWithYoutubeDl(
+        outputFile: File,
+        searchResult: SearchResult,
+        format: String,
+    ): Boolean =
+        withContext(Dispatchers.IO) {
+            try {
+                val url = "https://youtube.com/watch?v=${searchResult.videoId}"
+                val outputTemplate = outputFile.absolutePath.removeSuffix(".${outputFile.extension}")
+
+                val command =
+                    listOf(
+                        "youtube-dl",
+                        "--extract-audio",
+                        "--audio-format",
+                        format,
+                        "--audio-quality",
+                        "0", // Best quality
+                        "--embed-thumbnail", // Embed artwork
+                        "--add-metadata", // Add metadata
+                        "--output",
+                        "$outputTemplate.%(ext)s",
+                        "--no-playlist",
+                        url,
+                    )
+
+                println("Downloading with youtube-dl: ${searchResult.title} by ${searchResult.artist} as MP3...")
+
+                val process =
+                    ProcessBuilder(command)
+                        .apply {
+                            redirectErrorStream(true)
+                        }.start()
+
+                val output = process.inputStream.bufferedReader().readText()
+                val exitCode = process.waitFor()
+
+                if (exitCode == 0) {
+                    val downloadedFiles =
+                        outputFile.parentFile.listFiles { _, name ->
+                            name.startsWith(outputFile.nameWithoutExtension) &&
+                                name != outputFile.name &&
+                                name.endsWith(".mp3")
+                        }
+
+                    if (downloadedFiles?.isNotEmpty() == true) {
+                        val actualFile = downloadedFiles.first()
+                        if (actualFile.name != outputFile.name) {
+                            actualFile.renameTo(outputFile)
+                        }
+                        println("Successfully downloaded with youtube-dl: ${outputFile.name}")
+                        return@withContext true
+                    }
+                }
+
+                println("youtube-dl download failed with exit code: $exitCode")
+                println("Output: $output")
+                false
+            } catch (e: Exception) {
+                println("Error running youtube-dl: ${e.message}")
                 false
             }
         }

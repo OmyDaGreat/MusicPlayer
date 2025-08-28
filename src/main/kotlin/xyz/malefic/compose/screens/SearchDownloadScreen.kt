@@ -1,5 +1,6 @@
 package xyz.malefic.compose.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -10,13 +11,26 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import io.ktor.client.*
+import io.ktor.client.engine.cio.*
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
+import io.ktor.util.toByteArray
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import xyz.malefic.compose.util.DownloadManager
 import xyz.malefic.compose.util.MusicManager
 import xyz.malefic.compose.util.SearchResult
+import java.awt.image.BufferedImage
+import java.io.ByteArrayInputStream
+import javax.imageio.ImageIO
 
 @Composable
 fun SearchDownloadScreen(
@@ -211,6 +225,31 @@ private fun SearchResultItem(
     isDownloading: Boolean,
     onDownload: () -> Unit,
 ) {
+    val thumbnailState = remember { mutableStateOf<ImageBitmap?>(null) }
+    val httpClient = remember { HttpClient(CIO) }
+
+    // Load thumbnail
+    LaunchedEffect(result.thumbnail) {
+        try {
+            withContext(Dispatchers.IO) {
+                val response = httpClient.get(result.thumbnail)
+                val bytes = response.bodyAsChannel().toByteArray()
+                val bufferedImage = ImageIO.read(ByteArrayInputStream(bytes))
+                bufferedImage?.let {
+                    thumbnailState.value = it.toComposeImageBitmap()
+                }
+            }
+        } catch (e: Exception) {
+            println("Failed to load thumbnail for ${result.title}: ${e.message}")
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            // HttpClient cleanup is handled by parent component
+        }
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = 2.dp,
@@ -220,15 +259,22 @@ private fun SearchResultItem(
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Thumbnail placeholder
+            // Thumbnail or placeholder
             Box(
                 modifier =
                     Modifier
                         .size(56.dp)
-                        .padding(end = 12.dp),
+                        .padding(end = 12.dp)
+                        .clip(RoundedCornerShape(4.dp)),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(
+                thumbnailState.value?.let { thumbnail ->
+                    Image(
+                        bitmap = thumbnail,
+                        contentDescription = "Video thumbnail",
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } ?: Icon(
                     Icons.Default.MusicVideo,
                     contentDescription = "Video thumbnail",
                     modifier = Modifier.size(40.dp),

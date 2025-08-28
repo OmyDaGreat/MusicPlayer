@@ -226,6 +226,41 @@ class MusicManager {
     private fun extractOpusFallbackMetadata(file: File): Track {
         // For opus files, try to extract basic info from filename
         return try {
+            // First try to check for embedded artwork using JAudioTagger but catch TagLib errors
+            var embeddedArtworkPath: String? = null
+            try {
+                val audioFile = AudioFileIO.read(file)
+                val tag = audioFile.tag
+
+                // Check for embedded picture in Opus metadata
+                if (tag != null) {
+                    val artwork = tag.firstArtwork
+                    if (artwork != null) {
+                        // Save embedded artwork
+                        val safeFileName = file.nameWithoutExtension.replace("[^a-zA-Z0-9._-]".toRegex(), "_")
+                        val extension =
+                            when (artwork.mimeType) {
+                                "image/jpeg", "image/jpg" -> "jpg"
+                                "image/png" -> "png"
+                                "image/bmp" -> "bmp"
+                                "image/gif" -> "gif"
+                                else -> "jpg"
+                            }
+
+                        val artworkFile = File(artworkDirectory, "$safeFileName.$extension")
+
+                        if (!artworkFile.exists()) {
+                            Files.write(artworkFile.toPath(), artwork.binaryData)
+                            println("Extracted embedded artwork from Opus file: ${file.name}")
+                        }
+                        embeddedArtworkPath = artworkFile.absolutePath
+                    }
+                }
+            } catch (e: Exception) {
+                // TagLib errors are expected for Opus files, ignore and continue with filename parsing
+                println("Note: TagLib couldn't read Opus metadata (expected), using filename parsing: ${e.message}")
+            }
+
             // Try to parse filename patterns like "Title - Artist.opus"
             val nameWithoutExt = file.nameWithoutExtension
             val parts = nameWithoutExt.split(" - ", limit = 2)
@@ -248,8 +283,8 @@ class MusicManager {
                 }
             }
 
-            // Try to find downloaded artwork for this track
-            val artworkPath = findDownloadedArtwork(title, artist)
+            // Use embedded artwork if found, otherwise try to find downloaded artwork
+            val artworkPath = embeddedArtworkPath ?: findDownloadedArtwork(title, artist)
 
             Track(
                 id = UUID.randomUUID().toString(),

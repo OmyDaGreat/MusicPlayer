@@ -298,13 +298,16 @@ class ModernMusicPlayerService {
                 // Play next track
                 val nextTrack = nextTrack()
                 if (nextTrack != null) {
+                    _currentTrack.value = nextTrack // Update the current track state
                     GlobalScope.launch {
                         play(nextTrack)
                     }
                 } else if (_repeatMode.value == RepeatMode.ALL && currentPlaylist.isNotEmpty()) {
                     // Restart playlist
+                    val firstTrack = currentPlaylist.first()
+                    _currentTrack.value = firstTrack // Update the current track state
                     GlobalScope.launch {
-                        play(currentPlaylist.first())
+                        play(firstTrack)
                     }
                 }
             }
