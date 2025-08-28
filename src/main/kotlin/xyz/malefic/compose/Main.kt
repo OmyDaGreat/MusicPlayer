@@ -15,7 +15,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import kotlinx.coroutines.launch
-import xyz.malefic.compose.util.DownloadManager
+import xyz.malefic.compose.screens.SearchDownloadScreen
 import xyz.malefic.compose.util.MusicManager
 import xyz.malefic.compose.util.MusicPlayerService
 import xyz.malefic.compose.util.Playlist
@@ -43,6 +43,9 @@ fun MusicPlayerApp() {
     val isPlaying by musicPlayer.isPlaying
     val currentPosition by musicPlayer.currentPosition
     val duration by musicPlayer.duration
+    val volume by musicPlayer.volume
+    val isShuffleEnabled by musicPlayer.isShuffleEnabled
+    val repeatMode by musicPlayer.repeatMode
 
     var playlists by remember { mutableStateOf<List<Playlist>>(emptyList()) }
     var selectedPlaylist by remember { mutableStateOf<Playlist?>(null) }
@@ -128,10 +131,11 @@ fun MusicPlayerApp() {
                 modifier = Modifier.weight(1f).fillMaxHeight().padding(16.dp),
             ) {
                 if (showDownloader) {
-                    DownloaderSection(
-                        onTrackDownloaded = { track ->
+                    SearchDownloadScreen(
+                        musicManager = musicManager,
+                        onTrackDownloaded = {
                             scope.launch {
-                                musicManager.addTrackToAllMusic(track)
+                                musicManager.scanMusicDirectory()
                                 playlists = musicManager.loadPlaylists()
                             }
                         },
@@ -165,6 +169,9 @@ fun MusicPlayerApp() {
                     isPlaying = isPlaying,
                     currentPosition = currentPosition,
                     duration = duration,
+                    volume = volume,
+                    isShuffleEnabled = isShuffleEnabled,
+                    repeatMode = repeatMode,
                     onPlayPause = {
                         scope.launch {
                             if (isPlaying) {
@@ -197,6 +204,15 @@ fun MusicPlayerApp() {
                                 scope.launch { musicPlayer.play(it) }
                             }
                         }
+                    },
+                    onVolumeChanged = { newVolume ->
+                        musicPlayer.setVolume(newVolume)
+                    },
+                    onShuffleToggle = {
+                        musicPlayer.toggleShuffle()
+                    },
+                    onRepeatToggle = {
+                        musicPlayer.toggleRepeatMode()
                     },
                 )
             }
@@ -384,9 +400,15 @@ fun PlayerControls(
     isPlaying: Boolean,
     currentPosition: Long,
     duration: Long,
+    volume: Float,
+    isShuffleEnabled: Boolean,
+    repeatMode: xyz.malefic.compose.util.RepeatMode,
     onPlayPause: () -> Unit,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
+    onVolumeChanged: (Float) -> Unit,
+    onShuffleToggle: () -> Unit,
+    onRepeatToggle: () -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -428,10 +450,21 @@ fun PlayerControls(
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
+            // Main Controls Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
+                // Shuffle button
+                IconButton(onClick = onShuffleToggle) {
+                    Icon(
+                        Icons.Default.Shuffle,
+                        "Shuffle",
+                        tint = if (isShuffleEnabled) MaterialTheme.colors.primary else Color.Gray,
+                    )
+                }
+
                 IconButton(onClick = onPrevious) {
                     Icon(Icons.Default.SkipPrevious, "Previous")
                 }
@@ -446,90 +479,43 @@ fun PlayerControls(
                 IconButton(onClick = onNext) {
                     Icon(Icons.Default.SkipNext, "Next")
                 }
-            }
-        }
-    }
-}
 
-@Composable
-fun DownloaderSection(onTrackDownloaded: (Track) -> Unit) {
-    var downloadUrl by remember { mutableStateOf("") }
-    var isDownloading by remember { mutableStateOf(false) }
-    var downloadStatus by remember { mutableStateOf("") }
-    val scope = rememberCoroutineScope()
-    val downloadManager = remember { DownloadManager() }
-
-    Column {
-        Text("Download Music", style = MaterialTheme.typography.h5)
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            elevation = 4.dp,
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                OutlinedTextField(
-                    value = downloadUrl,
-                    onValueChange = { downloadUrl = it },
-                    label = { Text("Enter direct download URL") },
-                    placeholder = { Text("https://example.com/song.mp3") },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !isDownloading,
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Button(
-                    onClick = {
-                        if (downloadUrl.isNotBlank()) {
-                            scope.launch {
-                                isDownloading = true
-                                downloadStatus = "Downloading..."
-                                try {
-                                    val track = downloadManager.downloadTrack(downloadUrl)
-                                    onTrackDownloaded(track)
-                                    downloadStatus = "Download completed!"
-                                    downloadUrl = ""
-                                } catch (e: Exception) {
-                                    downloadStatus = "Download failed: ${e.message}"
-                                }
-                                isDownloading = false
-                            }
+                // Repeat button
+                IconButton(onClick = onRepeatToggle) {
+                    val (icon, tint) =
+                        when (repeatMode) {
+                            xyz.malefic.compose.util.RepeatMode.OFF -> Icons.Default.Repeat to Color.Gray
+                            xyz.malefic.compose.util.RepeatMode.ALL -> Icons.Default.Repeat to MaterialTheme.colors.primary
+                            xyz.malefic.compose.util.RepeatMode.ONE -> Icons.Default.RepeatOne to MaterialTheme.colors.primary
                         }
-                    },
-                    enabled = !isDownloading && downloadUrl.isNotBlank(),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    if (isDownloading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
-                            color = MaterialTheme.colors.onPrimary,
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                    }
-                    Text(if (isDownloading) "Downloading..." else "Download")
-                }
-
-                if (downloadStatus.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = downloadStatus,
-                        style = MaterialTheme.typography.body2,
-                        color = if (downloadStatus.contains("failed")) Color.Red else Color.Green,
-                    )
+                    Icon(icon, "Repeat", tint = tint)
                 }
             }
+
+            // Volume Control
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    Icons.Default.VolumeDown,
+                    contentDescription = "Volume",
+                    modifier = Modifier.size(20.dp),
+                )
+                Slider(
+                    value = volume,
+                    onValueChange = onVolumeChanged,
+                    modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                    valueRange = 0f..1f,
+                )
+                Icon(
+                    Icons.Default.VolumeUp,
+                    contentDescription = "Volume",
+                    modifier = Modifier.size(20.dp),
+                )
+            }
         }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text(
-            text =
-                "Note: This downloader works with direct file URLs only. " +
-                    "It does not support streaming services or protected content.",
-            style = MaterialTheme.typography.caption,
-            color = Color.Gray,
-        )
     }
 }
 
