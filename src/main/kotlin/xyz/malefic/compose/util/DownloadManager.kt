@@ -160,16 +160,34 @@ class DownloadManager {
     suspend fun downloadFromYouTube(searchResult: SearchResult): Track =
         withContext(Dispatchers.IO) {
             try {
+                // Prefer opus and m4a formats over mp3
+                val preferredFormats = listOf("opus", "m4a", "aac", "mp3")
+                val selectedFormat = preferredFormats.first() // Default to opus for best quality
+
                 // Note: In a real implementation, you would use yt-dlp or similar tool
                 // For now, we'll create a placeholder that could be extended
                 val fileName = "${searchResult.artist} - ${searchResult.title}".replace("[^a-zA-Z0-9 .-]".toRegex(), "")
-                val safeFileName = "$fileName.mp3"
+                val safeFileName = "$fileName.$selectedFormat"
                 val file = File(musicManager.downloadsDirectory, safeFileName)
+
+                // Download thumbnail as artwork
+                val artworkPath = downloadThumbnail(searchResult)
 
                 // Placeholder: In reality, you'd need to integrate with yt-dlp
                 // For now, create a placeholder file
                 if (!file.exists()) {
                     file.writeText("# Placeholder for YouTube download: ${searchResult.videoId}")
+
+                    // In a real implementation, you would run something like:
+                    // ProcessBuilder("yt-dlp",
+                    //     "--extract-audio",
+                    //     "--audio-format", selectedFormat,
+                    //     "--audio-quality", "0",  // Best quality
+                    //     "--embed-thumbnail",     // Embed artwork
+                    //     "--add-metadata",        // Add metadata
+                    //     "--output", file.absolutePath,
+                    //     "https://youtube.com/watch?v=${searchResult.videoId}"
+                    // ).start().waitFor()
                 }
 
                 val track =
@@ -181,6 +199,7 @@ class DownloadManager {
                         filePath = file.absolutePath,
                         duration = parseDuration(searchResult.duration),
                         url = "https://youtube.com/watch?v=${searchResult.videoId}",
+                        artworkPath = artworkPath,
                     )
 
                 // Add to All Music playlist
@@ -189,6 +208,27 @@ class DownloadManager {
                 track
             } catch (e: Exception) {
                 throw Exception("Failed to download from YouTube: ${e.message}")
+            }
+        }
+
+    private suspend fun downloadThumbnail(searchResult: SearchResult): String? =
+        withContext(Dispatchers.IO) {
+            try {
+                val response: HttpResponse = client.get(searchResult.thumbnail)
+                val artworkDir = File(musicManager.musicDirectory, "Artwork")
+                artworkDir.mkdirs()
+
+                val safeFileName = "${searchResult.artist}_${searchResult.title}".replace("[^a-zA-Z0-9._-]".toRegex(), "_")
+                val artworkFile = File(artworkDir, "$safeFileName.jpg")
+
+                val channel: ByteReadChannel = response.bodyAsChannel()
+                val bytes = channel.toByteArray()
+                artworkFile.writeBytes(bytes)
+
+                artworkFile.absolutePath
+            } catch (e: Exception) {
+                println("Failed to download thumbnail: ${e.message}")
+                null
             }
         }
 

@@ -27,15 +27,15 @@ dependencies {
     implementation(libs.precompose)
     implementation("androidx.compose.material:material-icons-extended:1.7.7")
 
-    // Audio playback - enhanced with more format support
-    implementation("com.googlecode.soundlibs:basicplayer:3.0.0.0")
+    // Enhanced metadata extraction and artwork support
+    implementation("org:jaudiotagger:2.0.3") // Use available version
+    implementation("org.mp4parser:isoparser:1.9.56") // For M4A/MP4 parsing
+    implementation("com.drewnoakes:metadata-extractor:2.19.0") // Additional metadata extraction
+    
+    // Enhanced audio format support through SPI
     implementation("com.googlecode.soundlibs:mp3spi:1.9.5.4")
     implementation("com.googlecode.soundlibs:tritonus-share:0.3.7.4")
     implementation("com.googlecode.soundlibs:vorbisspi:1.0.3.3") // For OGG Vorbis
-    implementation("org:jaudiotagger:2.0.3")
-    
-    // Enhanced metadata support
-    implementation("org.mp4parser:isoparser:1.9.56") // For M4A/MP4 parsing
     
     // HTTP client for downloading - updated versions
     implementation("io.ktor:ktor-client-core:2.3.12")

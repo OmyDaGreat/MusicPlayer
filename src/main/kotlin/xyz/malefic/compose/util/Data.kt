@@ -2,6 +2,12 @@ package xyz.malefic.compose.util
 
 import kotlinx.serialization.Serializable
 
+enum class RepeatMode {
+    OFF,
+    ALL,
+    ONE,
+}
+
 @Serializable
 data class Track(
     val id: String,
@@ -14,6 +20,7 @@ data class Track(
     val genre: String = "",
     val trackNumber: Int = 0,
     val url: String? = null,
+    val artworkPath: String? = null, // Path to extracted album artwork
 )
 
 @Serializable

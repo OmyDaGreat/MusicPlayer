@@ -7,7 +7,9 @@ import kotlinx.serialization.json.Json
 import org.jaudiotagger.audio.AudioFileIO
 import org.jaudiotagger.tag.FieldKey
 import java.io.File
+import java.nio.file.Files
 import java.util.*
+import javax.imageio.ImageIO
 
 class MusicManager {
     private val json = Json { prettyPrint = true }
@@ -24,10 +26,15 @@ class MusicManager {
         File(musicDirectory, "Downloads").apply { mkdirs() }
     }
 
+    private val artworkDirectory: File by lazy {
+        File(musicDirectory, "Artwork").apply { mkdirs() }
+    }
+
     suspend fun initializeMusicDirectory() =
         withContext(Dispatchers.IO) {
             musicDirectory.mkdirs()
             downloadsDirectory.mkdirs()
+            artworkDirectory.mkdirs()
 
             if (!playlistsFile.exists()) {
                 val defaultPlaylists =
@@ -44,7 +51,23 @@ class MusicManager {
 
     suspend fun scanMusicDirectory(): List<Track> =
         withContext(Dispatchers.IO) {
-            val audioExtensions = setOf("mp3", "wav", "flac", "au", "aiff", "ogg", "opus", "m4a", "aac", "wma")
+            // Enhanced format support including modern codecs
+            val audioExtensions =
+                setOf(
+                    "mp3",
+                    "wav",
+                    "flac",
+                    "au",
+                    "aiff",
+                    "ogg",
+                    "opus",
+                    "m4a",
+                    "aac",
+                    "wma",
+                    "mp4",
+                    "3gp",
+                    "webm",
+                )
             val tracks = mutableListOf<Track>()
 
             fun scanDirectory(directory: File) {
@@ -53,7 +76,7 @@ class MusicManager {
                         file.isDirectory -> scanDirectory(file)
                         file.extension.lowercase() in audioExtensions -> {
                             try {
-                                val track = extractMetadata(file)
+                                val track = extractEnhancedMetadata(file)
                                 tracks.add(track)
                                 println("Added track: ${track.title} by ${track.artist}")
                             } catch (e: Exception) {
@@ -87,7 +110,7 @@ class MusicManager {
             tracks
         }
 
-    private fun extractMetadata(file: File): Track =
+    private fun extractEnhancedMetadata(file: File): Track =
         try {
             val audioFile = AudioFileIO.read(file)
             val tag = audioFile.tag
@@ -111,9 +134,7 @@ class MusicManager {
                     ?: "Unknown Album"
 
             // Better duration extraction with fallbacks
-            val duration =
-                header?.trackLength?.toLong()
-                    ?: 0L
+            val duration = header?.trackLength?.toLong() ?: 0L
 
             // Enhanced year extraction
             val year =
@@ -142,6 +163,9 @@ class MusicManager {
                     0
                 }
 
+            // Extract and save album artwork
+            val artworkPath = extractAlbumArtwork(file, tag, album, artist)
+
             Track(
                 id = UUID.randomUUID().toString(),
                 title = title,
@@ -152,6 +176,7 @@ class MusicManager {
                 year = year,
                 genre = genre,
                 trackNumber = trackNumber,
+                artworkPath = artworkPath,
             )
         } catch (e: Exception) {
             println("Enhanced metadata extraction failed for ${file.name}: ${e.message}")
@@ -166,7 +191,62 @@ class MusicManager {
                 year = "",
                 genre = "",
                 trackNumber = 0,
+                artworkPath = null,
             )
+        }
+
+    private fun extractAlbumArtwork(
+        audioFile: File,
+        tag: org.jaudiotagger.tag.Tag?,
+        album: String,
+        artist: String,
+    ): String? =
+        try {
+            val artwork = tag?.firstArtwork
+            if (artwork != null) {
+                // Create a safe filename for the artwork
+                val safeAlbum = album.replace(Regex("[^a-zA-Z0-9._-]"), "_")
+                val safeArtist = artist.replace(Regex("[^a-zA-Z0-9._-]"), "_")
+                val extension =
+                    when (artwork.mimeType) {
+                        "image/jpeg", "image/jpg" -> "jpg"
+                        "image/png" -> "png"
+                        "image/bmp" -> "bmp"
+                        "image/gif" -> "gif"
+                        else -> "jpg" // Default to JPG
+                    }
+
+                val artworkFile = File(artworkDirectory, "${safeArtist}_$safeAlbum.$extension")
+
+                // Only save if doesn't exist already
+                if (!artworkFile.exists()) {
+                    Files.write(artworkFile.toPath(), artwork.binaryData)
+                    println("Extracted artwork for $album by $artist")
+                }
+
+                artworkFile.absolutePath
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            println("Error extracting artwork from ${audioFile.name}: ${e.message}")
+            null
+        }
+
+    suspend fun searchTracks(
+        query: String,
+        playlists: List<Playlist>,
+    ): List<Track> =
+        withContext(Dispatchers.IO) {
+            if (query.isBlank()) return@withContext emptyList()
+
+            val allTracks = playlists.flatMap { it.tracks }.distinctBy { it.filePath }
+            val searchTerms = query.lowercase().split(" ").filter { it.isNotBlank() }
+
+            allTracks.filter { track ->
+                val searchableText = "${track.title} ${track.artist} ${track.album} ${track.genre}".lowercase()
+                searchTerms.all { term -> searchableText.contains(term) }
+            }
         }
 
     suspend fun loadPlaylists(): List<Playlist> =

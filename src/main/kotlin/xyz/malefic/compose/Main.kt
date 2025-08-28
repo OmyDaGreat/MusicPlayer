@@ -1,31 +1,42 @@
 package xyz.malefic.compose
 
 import androidx.compose.desktop.ui.tooling.preview.Preview
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.toComposeImageBitmap
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import kotlinx.coroutines.launch
 import xyz.malefic.compose.screens.SearchDownloadScreen
+import xyz.malefic.compose.util.ModernMusicPlayerService
 import xyz.malefic.compose.util.MusicManager
-import xyz.malefic.compose.util.MusicPlayerService
 import xyz.malefic.compose.util.Playlist
+import xyz.malefic.compose.util.RepeatMode
 import xyz.malefic.compose.util.Track
+import java.awt.image.BufferedImage
+import java.io.File
+import javax.imageio.ImageIO
 
 fun main() =
     application {
         Window(
             onCloseRequest = ::exitApplication,
-            title = "Kotlin Music Player",
+            title = "Modern Kotlin Music Player",
         ) {
             MusicPlayerApp()
         }
@@ -36,7 +47,7 @@ fun main() =
 @Preview
 fun MusicPlayerApp() {
     val musicManager = remember { MusicManager() }
-    val musicPlayer = remember { MusicPlayerService() }
+    val musicPlayer = remember { ModernMusicPlayerService() }
     val scope = rememberCoroutineScope()
 
     var currentTrack by remember { mutableStateOf<Track?>(null) }
@@ -52,6 +63,20 @@ fun MusicPlayerApp() {
     var showDownloader by remember { mutableStateOf(false) }
     var showNewPlaylistDialog by remember { mutableStateOf(false) }
     var newPlaylistName by remember { mutableStateOf("") }
+    var searchQuery by remember { mutableStateOf("") }
+    var searchResults by remember { mutableStateOf<List<Track>>(emptyList()) }
+    var isSearching by remember { mutableStateOf(false) }
+
+    // Handle search
+    LaunchedEffect(searchQuery, playlists) {
+        if (searchQuery.isNotBlank()) {
+            isSearching = true
+            searchResults = musicManager.searchTracks(searchQuery, playlists)
+            isSearching = false
+        } else {
+            searchResults = emptyList()
+        }
+    }
 
     LaunchedEffect(Unit) {
         musicManager.initializeMusicDirectory()
@@ -74,14 +99,10 @@ fun MusicPlayerApp() {
                     ) {
                         Text("Playlists", style = MaterialTheme.typography.h6)
                         Row {
-                            IconButton(
-                                onClick = { showNewPlaylistDialog = true },
-                            ) {
+                            IconButton(onClick = { showNewPlaylistDialog = true }) {
                                 Icon(Icons.Default.Add, "New Playlist")
                             }
-                            IconButton(
-                                onClick = { showDownloader = !showDownloader },
-                            ) {
+                            IconButton(onClick = { showDownloader = !showDownloader }) {
                                 Icon(Icons.Default.Download, "Downloads")
                             }
                         }
@@ -92,10 +113,7 @@ fun MusicPlayerApp() {
                     LazyColumn {
                         items(playlists) { playlist ->
                             Card(
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 2.dp),
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
                                 backgroundColor =
                                     if (playlist == selectedPlaylist) {
                                         MaterialTheme.colors.primary.copy(alpha = 0.1f)
@@ -105,11 +123,10 @@ fun MusicPlayerApp() {
                                 onClick = {
                                     selectedPlaylist = playlist
                                     showDownloader = false
+                                    searchQuery = "" // Clear search when switching playlists
                                 },
                             ) {
-                                Column(
-                                    modifier = Modifier.padding(12.dp),
-                                ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
                                     Text(
                                         text = playlist.name,
                                         style = MaterialTheme.typography.body1,
@@ -142,13 +159,33 @@ fun MusicPlayerApp() {
                     )
                 } else {
                     selectedPlaylist?.let { playlist ->
+                        // Search bar
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                            placeholder = { Text("Search music...") },
+                            leadingIcon = { Icon(Icons.Default.Search, "Search") },
+                            trailingIcon = {
+                                if (searchQuery.isNotBlank()) {
+                                    IconButton(onClick = { searchQuery = "" }) {
+                                        Icon(Icons.Default.Clear, "Clear")
+                                    }
+                                }
+                            },
+                            singleLine = true,
+                        )
+
                         PlaylistView(
                             playlist = playlist,
+                            searchResults = if (searchQuery.isNotBlank()) searchResults else emptyList(),
+                            isSearching = isSearching,
                             currentTrack = currentTrack,
                             onTrackSelected = { track ->
                                 currentTrack = track
                                 scope.launch {
-                                    musicPlayer.playWithPlaylist(track, playlist.tracks)
+                                    val tracksToPlay = if (searchQuery.isNotBlank()) searchResults else playlist.tracks
+                                    musicPlayer.playWithPlaylist(track, tracksToPlay)
                                 }
                             },
                             onRefreshMusic = {
@@ -177,15 +214,18 @@ fun MusicPlayerApp() {
                             if (isPlaying) {
                                 musicPlayer.pause()
                             } else {
-                                currentTrack?.let { musicPlayer.play(it) }
+                                currentTrack?.let {
+                                    if (musicPlayer.currentTrack.value == it) {
+                                        musicPlayer.resume()
+                                    } else {
+                                        musicPlayer.play(it)
+                                    }
+                                }
                             }
                         }
                     },
                     onPrevious = {
                         selectedPlaylist?.let { playlist ->
-                            scope.launch {
-                                musicPlayer.playWithPlaylist(currentTrack!!, playlist.tracks)
-                            }
                             val prevTrack = musicPlayer.previousTrack()
                             prevTrack?.let {
                                 currentTrack = it
@@ -195,15 +235,15 @@ fun MusicPlayerApp() {
                     },
                     onNext = {
                         selectedPlaylist?.let { playlist ->
-                            scope.launch {
-                                musicPlayer.playWithPlaylist(currentTrack!!, playlist.tracks)
-                            }
                             val nextTrack = musicPlayer.nextTrack()
                             nextTrack?.let {
                                 currentTrack = it
                                 scope.launch { musicPlayer.play(it) }
                             }
                         }
+                    },
+                    onSeek = { positionSeconds ->
+                        musicPlayer.seek(positionSeconds)
                     },
                     onVolumeChanged = { newVolume ->
                         musicPlayer.setVolume(newVolume)
@@ -248,9 +288,7 @@ fun MusicPlayerApp() {
                     }
                 },
                 dismissButton = {
-                    TextButton(
-                        onClick = { showNewPlaylistDialog = false },
-                    ) {
+                    TextButton(onClick = { showNewPlaylistDialog = false }) {
                         Text("Cancel")
                     }
                 },
@@ -262,6 +300,8 @@ fun MusicPlayerApp() {
 @Composable
 fun PlaylistView(
     playlist: Playlist,
+    searchResults: List<Track>,
+    isSearching: Boolean,
     currentTrack: Track?,
     onTrackSelected: (Track) -> Unit,
     onRefreshMusic: () -> Unit,
@@ -273,18 +313,32 @@ fun PlaylistView(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column {
+                val displayName =
+                    if (searchResults.isNotEmpty()) {
+                        "Search Results"
+                    } else {
+                        playlist.name
+                    }
+
+                val trackCount =
+                    if (searchResults.isNotEmpty()) {
+                        searchResults.size
+                    } else {
+                        playlist.tracks.size
+                    }
+
                 Text(
-                    text = playlist.name,
+                    text = displayName,
                     style = MaterialTheme.typography.h5,
                 )
                 Text(
-                    text = "${playlist.tracks.size} songs",
+                    text = "$trackCount songs",
                     style = MaterialTheme.typography.caption,
                     color = Color.Gray,
                 )
             }
 
-            if (playlist.name == "All Music") {
+            if (playlist.name == "All Music" && searchResults.isEmpty()) {
                 IconButton(onClick = onRefreshMusic) {
                     Icon(Icons.Default.Refresh, "Refresh Music")
                 }
@@ -293,8 +347,18 @@ fun PlaylistView(
 
         Divider(modifier = Modifier.padding(vertical = 16.dp))
 
-        if (playlist.tracks.isEmpty()) {
-            // Empty playlist placeholder
+        val tracksToDisplay = if (searchResults.isNotEmpty()) searchResults else playlist.tracks
+
+        if (isSearching) {
+            // Show loading indicator
+            Box(
+                modifier = Modifier.fillMaxWidth().padding(32.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator()
+            }
+        } else if (tracksToDisplay.isEmpty()) {
+            // Empty state
             Card(
                 modifier = Modifier.fillMaxWidth().padding(32.dp),
                 elevation = 2.dp,
@@ -312,10 +376,12 @@ fun PlaylistView(
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
                         text =
-                            if (playlist.name == "All Music") {
-                                "No music found in your music directory.\nClick the refresh button to scan for music files."
-                            } else {
-                                "This playlist is empty.\nAdd some tracks to get started!"
+                            when {
+                                searchResults.isEmpty() && playlist.name != "All Music" ->
+                                    "This playlist is empty.\nAdd some tracks to get started!"
+                                searchResults.isEmpty() && playlist.name == "All Music" ->
+                                    "No music found in your music directory.\nClick the refresh button to scan for music files."
+                                else -> "No tracks found matching your search."
                             },
                         style = MaterialTheme.typography.body1,
                         color = Color.Gray,
@@ -324,7 +390,7 @@ fun PlaylistView(
             }
         } else {
             LazyColumn {
-                items(playlist.tracks) { track ->
+                items(tracksToDisplay) { track ->
                     TrackItem(
                         track = track,
                         isCurrentTrack = track == currentTrack,
@@ -344,10 +410,7 @@ fun TrackItem(
     onClick: () -> Unit,
 ) {
     Card(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(vertical = 2.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
         backgroundColor =
             if (isCurrentTrack) {
                 MaterialTheme.colors.primary.copy(alpha = 0.1f)
@@ -357,17 +420,38 @@ fun TrackItem(
         onClick = onClick,
     ) {
         Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp),
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                Icons.Default.MusicNote,
-                contentDescription = "Track",
-                tint = if (isCurrentTrack) MaterialTheme.colors.primary else Color.Gray,
-            )
+            // Album artwork or music note icon
+            if (track.artworkPath != null && File(track.artworkPath).exists()) {
+                val artwork =
+                    remember(track.artworkPath) {
+                        loadArtwork(track.artworkPath)
+                    }
+                if (artwork != null) {
+                    Image(
+                        bitmap = artwork,
+                        contentDescription = "Album Art",
+                        modifier = Modifier.size(48.dp).clip(RoundedCornerShape(4.dp)),
+                    )
+                } else {
+                    Icon(
+                        Icons.Default.MusicNote,
+                        contentDescription = "Track",
+                        modifier = Modifier.size(48.dp),
+                        tint = if (isCurrentTrack) MaterialTheme.colors.primary else Color.Gray,
+                    )
+                }
+            } else {
+                Icon(
+                    Icons.Default.MusicNote,
+                    contentDescription = "Track",
+                    modifier = Modifier.size(48.dp),
+                    tint = if (isCurrentTrack) MaterialTheme.colors.primary else Color.Gray,
+                )
+            }
+
             Spacer(modifier = Modifier.width(12.dp))
 
             Column(modifier = Modifier.weight(1f)) {
@@ -375,12 +459,25 @@ fun TrackItem(
                     text = track.title,
                     style = MaterialTheme.typography.body1,
                     color = if (isCurrentTrack) MaterialTheme.colors.primary else Color.Unspecified,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = track.artist,
                     style = MaterialTheme.typography.body2,
                     color = Color.Gray,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
+                if (track.album != "Unknown Album") {
+                    Text(
+                        text = track.album,
+                        style = MaterialTheme.typography.caption,
+                        color = Color.Gray,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
 
             if (track.duration > 0) {
@@ -394,6 +491,14 @@ fun TrackItem(
     }
 }
 
+private fun loadArtwork(artworkPath: String): ImageBitmap? =
+    try {
+        val bufferedImage = ImageIO.read(File(artworkPath))
+        bufferedImage?.toComposeImageBitmap()
+    } catch (e: Exception) {
+        null
+    }
+
 @Composable
 fun PlayerControls(
     currentTrack: Track?,
@@ -402,10 +507,11 @@ fun PlayerControls(
     duration: Long,
     volume: Float,
     isShuffleEnabled: Boolean,
-    repeatMode: xyz.malefic.compose.util.RepeatMode,
+    repeatMode: RepeatMode,
     onPlayPause: () -> Unit,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
+    onSeek: (Long) -> Unit,
     onVolumeChanged: (Float) -> Unit,
     onShuffleToggle: () -> Unit,
     onRepeatToggle: () -> Unit,
@@ -416,28 +522,94 @@ fun PlayerControls(
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             currentTrack?.let { track ->
-                Text(
-                    text = track.title,
-                    style = MaterialTheme.typography.h6,
-                )
-                Text(
-                    text = track.artist,
-                    style = MaterialTheme.typography.body2,
-                    color = Color.Gray,
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    // Album artwork or music note icon
+                    if (track.artworkPath != null && File(track.artworkPath).exists()) {
+                        val artwork =
+                            remember(track.artworkPath) {
+                                loadArtwork(track.artworkPath)
+                            }
+                        if (artwork != null) {
+                            Image(
+                                bitmap = artwork,
+                                contentDescription = "Album Art",
+                                modifier = Modifier.size(64.dp).clip(RoundedCornerShape(8.dp)),
+                            )
+                        } else {
+                            Icon(
+                                Icons.Default.MusicNote,
+                                contentDescription = "Track",
+                                modifier = Modifier.size(64.dp),
+                                tint = MaterialTheme.colors.primary,
+                            )
+                        }
+                    } else {
+                        Icon(
+                            Icons.Default.MusicNote,
+                            contentDescription = "Track",
+                            modifier = Modifier.size(64.dp),
+                            tint = MaterialTheme.colors.primary,
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = track.title,
+                            style = MaterialTheme.typography.h6,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = track.artist,
+                            style = MaterialTheme.typography.body2,
+                            color = Color.Gray,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (track.album != "Unknown Album") {
+                            Text(
+                                text = track.album,
+                                style = MaterialTheme.typography.caption,
+                                color = Color.Gray,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
 
                 if (duration > 0) {
                     Spacer(modifier = Modifier.height(8.dp))
-                    LinearProgressIndicator(
-                        progress = currentPosition.toFloat() / duration.toFloat(),
+
+                    // Seekable progress bar
+                    var seekPosition by remember { mutableStateOf(currentPosition) }
+                    var isSeeking by remember { mutableStateOf(false) }
+
+                    Slider(
+                        value = if (isSeeking) seekPosition.toFloat() else currentPosition.toFloat(),
+                        onValueChange = {
+                            seekPosition = it.toLong()
+                            isSeeking = true
+                        },
+                        onValueChangeFinished = {
+                            onSeek(seekPosition)
+                            isSeeking = false
+                        },
+                        valueRange = 0f..duration.toFloat(),
                         modifier = Modifier.fillMaxWidth(),
                     )
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
                         Text(
-                            text = formatTime(currentPosition),
+                            text = formatTime(if (isSeeking) seekPosition else currentPosition),
                             style = MaterialTheme.typography.caption,
                         )
                         Text(
@@ -484,9 +656,9 @@ fun PlayerControls(
                 IconButton(onClick = onRepeatToggle) {
                     val (icon, tint) =
                         when (repeatMode) {
-                            xyz.malefic.compose.util.RepeatMode.OFF -> Icons.Default.Repeat to Color.Gray
-                            xyz.malefic.compose.util.RepeatMode.ALL -> Icons.Default.Repeat to MaterialTheme.colors.primary
-                            xyz.malefic.compose.util.RepeatMode.ONE -> Icons.Default.RepeatOne to MaterialTheme.colors.primary
+                            RepeatMode.OFF -> Icons.Default.Repeat to Color.Gray
+                            RepeatMode.ALL -> Icons.Default.Repeat to MaterialTheme.colors.primary
+                            RepeatMode.ONE -> Icons.Default.RepeatOne to MaterialTheme.colors.primary
                         }
                     Icon(icon, "Repeat", tint = tint)
                 }
