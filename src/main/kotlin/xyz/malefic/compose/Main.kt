@@ -144,7 +144,7 @@ fun MusicPlayerApp() {
                             onTrackSelected = { track ->
                                 currentTrack = track
                                 scope.launch {
-                                    musicPlayer.play(track)
+                                    musicPlayer.playWithPlaylist(track, playlist.tracks)
                                 }
                             },
                             onRefreshMusic = {
@@ -176,14 +176,26 @@ fun MusicPlayerApp() {
                     },
                     onPrevious = {
                         selectedPlaylist?.let { playlist ->
-                            currentTrack = musicPlayer.previousTrack(playlist.tracks, currentTrack)
-                            currentTrack?.let { scope.launch { musicPlayer.play(it) } }
+                            scope.launch {
+                                musicPlayer.playWithPlaylist(currentTrack!!, playlist.tracks)
+                            }
+                            val prevTrack = musicPlayer.previousTrack()
+                            prevTrack?.let {
+                                currentTrack = it
+                                scope.launch { musicPlayer.play(it) }
+                            }
                         }
                     },
                     onNext = {
                         selectedPlaylist?.let { playlist ->
-                            currentTrack = musicPlayer.nextTrack(playlist.tracks, currentTrack)
-                            currentTrack?.let { scope.launch { musicPlayer.play(it) } }
+                            scope.launch {
+                                musicPlayer.playWithPlaylist(currentTrack!!, playlist.tracks)
+                            }
+                            val nextTrack = musicPlayer.nextTrack()
+                            nextTrack?.let {
+                                currentTrack = it
+                                scope.launch { musicPlayer.play(it) }
+                            }
                         }
                     },
                 )

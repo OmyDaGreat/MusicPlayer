@@ -7,8 +7,17 @@ import javazoom.jlgui.basicplayer.BasicPlayer
 import javazoom.jlgui.basicplayer.BasicPlayerEvent
 import javazoom.jlgui.basicplayer.BasicPlayerListener
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import kotlin.random.Random
+
+enum class RepeatMode {
+    OFF,
+    ALL,
+    ONE,
+}
 
 class MusicPlayerService : BasicPlayerListener {
     private val player = BasicPlayer()
@@ -26,6 +35,21 @@ class MusicPlayerService : BasicPlayerListener {
     private var _currentTrackInfo = mutableStateOf<Map<String, Any>>(emptyMap())
     val currentTrackInfo: State<Map<String, Any>> = _currentTrackInfo
 
+    private var _volume = mutableStateOf(1.0f)
+    val volume: State<Float> = _volume
+
+    private var _isShuffleEnabled = mutableStateOf(false)
+    val isShuffleEnabled: State<Boolean> = _isShuffleEnabled
+
+    private var _repeatMode = mutableStateOf(RepeatMode.OFF)
+    val repeatMode: State<RepeatMode> = _repeatMode
+
+    private var _currentTrack = mutableStateOf<Track?>(null)
+    val currentTrack: State<Track?> = _currentTrack
+
+    private var shuffledPlaylist: List<Track> = emptyList()
+    private var currentPlaylist: List<Track> = emptyList()
+
     init {
         player.addBasicPlayerListener(this)
     }
@@ -35,6 +59,7 @@ class MusicPlayerService : BasicPlayerListener {
             try {
                 val file = File(track.filePath)
                 if (file.exists()) {
+                    _currentTrack.value = track
                     player.open(file)
                     player.play()
                 }
@@ -42,6 +67,19 @@ class MusicPlayerService : BasicPlayerListener {
                 println("Error playing track: ${e.message}")
             }
         }
+
+    suspend fun playWithPlaylist(
+        track: Track,
+        playlist: List<Track>,
+    ) = withContext(Dispatchers.IO) {
+        try {
+            currentPlaylist = playlist
+            updateShuffledPlaylist()
+            play(track)
+        } catch (e: Exception) {
+            println("Error playing track with playlist: ${e.message}")
+        }
+    }
 
     fun pause() {
         try {
@@ -51,15 +89,90 @@ class MusicPlayerService : BasicPlayerListener {
         }
     }
 
+    fun resume() {
+        try {
+            player.resume()
+        } catch (e: Exception) {
+            println("Error resuming: ${e.message}")
+        }
+    }
+
     fun stop() {
         try {
             player.stop()
+            _currentTrack.value = null
         } catch (e: Exception) {
             println("Error stopping: ${e.message}")
         }
     }
 
-    fun nextTrack(
+    fun setVolume(volume: Float) {
+        try {
+            val clampedVolume = volume.coerceIn(0f, 1f)
+            _volume.value = clampedVolume
+            val gain = clampedVolume.toDouble()
+            player.setGain(gain)
+        } catch (e: Exception) {
+            println("Error setting volume: ${e.message}")
+        }
+    }
+
+    fun toggleShuffle() {
+        _isShuffleEnabled.value = !_isShuffleEnabled.value
+        updateShuffledPlaylist()
+    }
+
+    fun setRepeatMode(mode: RepeatMode) {
+        _repeatMode.value = mode
+    }
+
+    fun toggleRepeatMode() {
+        _repeatMode.value =
+            when (_repeatMode.value) {
+                RepeatMode.OFF -> RepeatMode.ALL
+                RepeatMode.ALL -> RepeatMode.ONE
+                RepeatMode.ONE -> RepeatMode.OFF
+            }
+    }
+
+    fun seek(positionSeconds: Long) {
+        try {
+            // BasicPlayer doesn't support seeking directly
+            // This is a limitation of the current audio library
+            println("Seek functionality not supported by BasicPlayer")
+        } catch (e: Exception) {
+            println("Error seeking: ${e.message}")
+        }
+    }
+
+    private fun updateShuffledPlaylist() {
+        shuffledPlaylist =
+            if (_isShuffleEnabled.value) {
+                currentPlaylist.shuffled(Random.Default)
+            } else {
+                currentPlaylist
+            }
+    }
+
+    fun nextTrack(): Track? =
+        when (_repeatMode.value) {
+            RepeatMode.ONE -> _currentTrack.value
+            RepeatMode.ALL, RepeatMode.OFF -> {
+                val playlist = if (_isShuffleEnabled.value) shuffledPlaylist else currentPlaylist
+                getNextTrack(playlist, _currentTrack.value)
+            }
+        }
+
+    fun previousTrack(): Track? =
+        when (_repeatMode.value) {
+            RepeatMode.ONE -> _currentTrack.value
+            RepeatMode.ALL, RepeatMode.OFF -> {
+                val playlist = if (_isShuffleEnabled.value) shuffledPlaylist else currentPlaylist
+                getPreviousTrack(playlist, _currentTrack.value)
+            }
+        }
+
+    private fun getNextTrack(
         playlist: List<Track>,
         current: Track?,
     ): Track? {
@@ -67,12 +180,14 @@ class MusicPlayerService : BasicPlayerListener {
         val currentIndex = playlist.indexOf(current)
         return if (currentIndex >= 0 && currentIndex < playlist.size - 1) {
             playlist[currentIndex + 1]
-        } else {
+        } else if (_repeatMode.value == RepeatMode.ALL) {
             playlist.firstOrNull()
+        } else {
+            null
         }
     }
 
-    fun previousTrack(
+    private fun getPreviousTrack(
         playlist: List<Track>,
         current: Track?,
     ): Track? {
@@ -80,8 +195,10 @@ class MusicPlayerService : BasicPlayerListener {
         val currentIndex = playlist.indexOf(current)
         return if (currentIndex > 0) {
             playlist[currentIndex - 1]
-        } else {
+        } else if (_repeatMode.value == RepeatMode.ALL) {
             playlist.lastOrNull()
+        } else {
+            null
         }
     }
 
@@ -135,7 +252,23 @@ class MusicPlayerService : BasicPlayerListener {
                 }
                 BasicPlayerEvent.EOM -> {
                     _isPlaying.value = false
-                    println("End of media reached")
+                    println("End of media reached - playing next track")
+                    // Auto-play next track if not in repeat one mode
+                    if (_repeatMode.value != RepeatMode.ONE) {
+                        val nextTrack = nextTrack()
+                        nextTrack?.let { track ->
+                            GlobalScope.launch {
+                                play(track)
+                            }
+                        }
+                    } else {
+                        // Repeat current track
+                        _currentTrack.value?.let { track ->
+                            GlobalScope.launch {
+                                play(track)
+                            }
+                        }
+                    }
                 }
                 BasicPlayerEvent.UNKNOWN -> println("Unknown player event")
             }
