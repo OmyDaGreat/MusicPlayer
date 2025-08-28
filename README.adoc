@@ -6,7 +6,7 @@
 
 A comprehensive desktop music player built with Jetbrains Compose for Desktop, featuring modern audio playback, playlist management, and music downloading capabilities.
 
-image::homepage.png[Basic Homepage created with this template]
+Created as a birthday present for my little sister, so it attempts to be tuned to her specifications. We'll see how that turns out!
 
 == Overview
 
