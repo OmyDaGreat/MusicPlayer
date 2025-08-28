@@ -7,15 +7,15 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.BufferedInputStream
+import uk.co.caprica.vlcj.player.base.MediaPlayer
+import uk.co.caprica.vlcj.player.base.MediaPlayerEventAdapter
+import uk.co.caprica.vlcj.player.component.AudioPlayerComponent
 import java.io.File
-import java.io.FileInputStream
-import javax.sound.sampled.*
 import kotlin.random.Random
 
 class ModernMusicPlayerService {
-    private var audioInputStream: AudioInputStream? = null
-    private var clip: Clip? = null
+    private var audioPlayer: AudioPlayerComponent? = null
+    private var mediaPlayer: MediaPlayer? = null
 
     // State variables for UI updates
     private var _isPlaying = mutableStateOf(false)
@@ -44,7 +44,58 @@ class ModernMusicPlayerService {
     private var isDisposed = false
 
     init {
-        // Start position monitoring
+        try {
+            initializeVlcPlayer()
+            startPositionMonitoring()
+        } catch (e: Exception) {
+            println("Error initializing VLCJ player: ${e.message}")
+            e.printStackTrace()
+        }
+    }
+
+    private fun initializeVlcPlayer() {
+        audioPlayer = AudioPlayerComponent()
+        mediaPlayer = audioPlayer?.mediaPlayer()
+
+        mediaPlayer?.events()?.addMediaPlayerEventListener(
+            object : MediaPlayerEventAdapter() {
+                override fun playing(mediaPlayer: MediaPlayer) {
+                    _isPlaying.value = true
+                    // Get duration when media starts playing
+                    val durationMs = mediaPlayer.status().length()
+                    _duration.value = durationMs / 1000
+                    println("Playing: ${_currentTrack.value?.title} - Duration: ${_duration.value}s")
+                }
+
+                override fun paused(mediaPlayer: MediaPlayer) {
+                    _isPlaying.value = false
+                }
+
+                override fun stopped(mediaPlayer: MediaPlayer) {
+                    _isPlaying.value = false
+                }
+
+                override fun finished(mediaPlayer: MediaPlayer) {
+                    _isPlaying.value = false
+                    handleEndOfMedia()
+                }
+
+                override fun error(mediaPlayer: MediaPlayer) {
+                    _isPlaying.value = false
+                    println("VLC Media Player error occurred")
+                }
+
+                override fun timeChanged(
+                    mediaPlayer: MediaPlayer,
+                    newTime: Long,
+                ) {
+                    _currentPosition.value = newTime / 1000
+                }
+            },
+        )
+    }
+
+    private fun startPositionMonitoring() {
         GlobalScope.launch {
             monitorPosition()
         }
@@ -52,20 +103,15 @@ class ModernMusicPlayerService {
 
     private suspend fun monitorPosition() {
         while (!isDisposed) {
-            clip?.let { c ->
-                if (c.isRunning) {
-                    val framePosition = c.framePosition
-                    val frameRate = c.format.frameRate
-                    if (frameRate > 0) {
-                        _currentPosition.value = (framePosition / frameRate).toLong()
-                    }
-
-                    // Check if playback is finished
-                    if (!c.isRunning && _isPlaying.value) {
-                        _isPlaying.value = false
-                        handleEndOfMedia()
+            try {
+                mediaPlayer?.let { mp ->
+                    if (mp.status().isPlaying) {
+                        val timeMs = mp.status().time()
+                        _currentPosition.value = timeMs / 1000
                     }
                 }
+            } catch (e: Exception) {
+                // Ignore errors during monitoring
             }
             delay(100) // Update every 100ms
         }
@@ -78,51 +124,18 @@ class ModernMusicPlayerService {
                 if (file.exists()) {
                     stop() // Stop current playback
 
-                    // Try to load the audio file
-                    val fileInputStream = FileInputStream(file)
-                    val bufferedInputStream = BufferedInputStream(fileInputStream)
+                    _currentTrack.value = track
+                    _duration.value = track.duration
 
-                    try {
-                        audioInputStream = AudioSystem.getAudioInputStream(bufferedInputStream)
-                        val format = audioInputStream!!.format
-
-                        // Convert to PCM format if needed
-                        val decodedFormat =
-                            AudioFormat(
-                                AudioFormat.Encoding.PCM_SIGNED,
-                                format.sampleRate,
-                                16,
-                                format.channels,
-                                format.channels * 2,
-                                format.sampleRate,
-                                false,
-                            )
-
-                        val decodedStream = AudioSystem.getAudioInputStream(decodedFormat, audioInputStream!!)
-
-                        clip = AudioSystem.getClip()
-                        clip!!.open(decodedStream)
-
-                        // Calculate duration
-                        val frameLength = clip!!.frameLength
-                        val frameRate = clip!!.format.frameRate
-                        _duration.value = if (frameRate > 0) (frameLength / frameRate).toLong() else 0L
-
-                        // Set volume
+                    // Use VLCJ to play the media file
+                    val success = mediaPlayer?.media()?.play(file.absolutePath) ?: false
+                    if (success) {
+                        // Set initial volume
                         setVolumeInternal(_volume.value)
-
-                        _currentTrack.value = track
-                        clip!!.start()
-                        _isPlaying.value = true
-
-                        println("Playing: ${track.title} by ${track.artist}")
-                    } catch (e: UnsupportedAudioFileException) {
-                        println("Unsupported audio format for ${track.title}: ${e.message}")
-                        // Try fallback for unsupported formats
-                        tryFallbackPlay(file, track)
-                    } catch (e: Exception) {
-                        println("Error creating audio stream for ${track.title}: ${e.message}")
-                        e.printStackTrace()
+                        println("Successfully loaded: ${track.title} by ${track.artist}")
+                        println("File format: ${file.extension} - Full path: ${file.absolutePath}")
+                    } else {
+                        println("Failed to load media file: ${file.absolutePath}")
                     }
                 } else {
                     println("File does not exist: ${track.filePath}")
@@ -132,37 +145,6 @@ class ModernMusicPlayerService {
                 e.printStackTrace()
             }
         }
-
-    private fun tryFallbackPlay(
-        file: File,
-        track: Track,
-    ) {
-        // Advanced fallback handling for unsupported formats
-        val extension = file.extension.lowercase()
-
-        when (extension) {
-            "opus" -> {
-                println("Opus format detected but not supported by Java Sound API.")
-                println("Opus files require native codec support or external conversion.")
-            }
-            "m4a", "mp4", "aac" -> {
-                println("M4A/AAC format detected but may have limited support.")
-                println("Some M4A files may require additional codecs or external conversion.")
-            }
-            else -> {
-                println("Format not supported natively: $extension. Consider using an external converter.")
-            }
-        }
-
-        // Set track as current but not playing
-        _currentTrack.value = track
-        _duration.value = track.duration
-        _isPlaying.value = false
-
-        // Show helpful message to user
-        println("Track '${track.title}' loaded but cannot be played due to format limitations.")
-        println("Supported formats: MP3, WAV, FLAC, OGG (Vorbis)")
-    }
 
     suspend fun playWithPlaylist(
         track: Track,
@@ -179,12 +161,7 @@ class ModernMusicPlayerService {
 
     fun pause() {
         try {
-            clip?.let { c ->
-                if (c.isRunning) {
-                    c.stop()
-                    _isPlaying.value = false
-                }
-            }
+            mediaPlayer?.controls()?.pause()
         } catch (e: Exception) {
             println("Error pausing: ${e.message}")
         }
@@ -192,12 +169,7 @@ class ModernMusicPlayerService {
 
     fun resume() {
         try {
-            clip?.let { c ->
-                if (!c.isRunning && c.framePosition < c.frameLength) {
-                    c.start()
-                    _isPlaying.value = true
-                }
-            }
+            mediaPlayer?.controls()?.play()
         } catch (e: Exception) {
             println("Error resuming: ${e.message}")
         }
@@ -205,15 +177,7 @@ class ModernMusicPlayerService {
 
     fun stop() {
         try {
-            clip?.let { c ->
-                if (c.isOpen) {
-                    c.stop()
-                    c.close()
-                }
-            }
-            audioInputStream?.close()
-            clip = null
-            audioInputStream = null
+            mediaPlayer?.controls()?.stop()
             _isPlaying.value = false
             _currentPosition.value = 0L
         } catch (e: Exception) {
@@ -228,14 +192,8 @@ class ModernMusicPlayerService {
 
     private fun setVolumeInternal(volume: Float) {
         try {
-            clip?.let { c ->
-                if (c.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
-                    val gainControl = c.getControl(FloatControl.Type.MASTER_GAIN) as FloatControl
-                    val range = gainControl.maximum - gainControl.minimum
-                    val gain = (range * volume) + gainControl.minimum
-                    gainControl.value = gain
-                }
-            }
+            val vlcVolume = (volume * 100).toInt().coerceIn(0, 100)
+            mediaPlayer?.audio()?.setVolume(vlcVolume)
         } catch (e: Exception) {
             println("Error setting volume: ${e.message}")
         }
@@ -243,16 +201,9 @@ class ModernMusicPlayerService {
 
     fun seek(positionSeconds: Long) {
         try {
-            clip?.let { c ->
-                val frameRate = c.format.frameRate
-                if (frameRate > 0) {
-                    val framePosition = (positionSeconds * frameRate).toLong()
-                    if (framePosition >= 0 && framePosition < c.frameLength) {
-                        c.framePosition = framePosition.toInt()
-                        _currentPosition.value = positionSeconds
-                    }
-                }
-            }
+            val positionMs = positionSeconds * 1000
+            mediaPlayer?.controls()?.setTime(positionMs)
+            _currentPosition.value = positionSeconds
         } catch (e: Exception) {
             println("Error seeking: ${e.message}")
         }
@@ -362,6 +313,12 @@ class ModernMusicPlayerService {
 
     fun dispose() {
         isDisposed = true
-        stop()
+        try {
+            stop()
+            mediaPlayer?.release()
+            audioPlayer?.release()
+        } catch (e: Exception) {
+            println("Error disposing player: ${e.message}")
+        }
     }
 }

@@ -27,15 +27,15 @@ dependencies {
     implementation(libs.precompose)
     implementation("androidx.compose.material:material-icons-extended:1.7.7")
 
+    // VLCJ for enhanced audio format support (Opus, M4A, etc.)
+    implementation("uk.co.caprica:vlcj:4.8.2")
+    implementation("net.java.dev.jna:jna:5.14.0")
+    implementation("net.java.dev.jna:jna-platform:5.14.0")
+
     // Enhanced metadata extraction and artwork support
     implementation("org:jaudiotagger:2.0.3") // Use available version
     implementation("org.mp4parser:isoparser:1.9.56") // For M4A/MP4 parsing
     implementation("com.drewnoakes:metadata-extractor:2.19.0") // Additional metadata extraction
-    
-    // Enhanced audio format support through SPI
-    implementation("com.googlecode.soundlibs:mp3spi:1.9.5.4")
-    implementation("com.googlecode.soundlibs:tritonus-share:0.3.7.4")
-    implementation("com.googlecode.soundlibs:vorbisspi:1.0.3.3") // For OGG Vorbis
     
     // Enhanced metadata support for more formats
     implementation("com.mpatric:mp3agic:0.9.1") // Alternative MP3 metadata
