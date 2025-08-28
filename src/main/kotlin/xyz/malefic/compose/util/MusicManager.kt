@@ -76,6 +76,12 @@ class MusicManager {
                         file.isDirectory -> scanDirectory(file)
                         file.extension.lowercase() in audioExtensions -> {
                             try {
+                                // Skip placeholder files created by failed downloads
+                                if (isPlaceholderFile(file)) {
+                                    println("Skipping placeholder file: ${file.name}")
+                                    return@forEach
+                                }
+
                                 val track = extractEnhancedMetadata(file)
                                 tracks.add(track)
                                 println("Added track: ${track.title} by ${track.artist}")
@@ -108,6 +114,18 @@ class MusicManager {
             }
 
             tracks
+        }
+
+    private fun isPlaceholderFile(file: File): Boolean =
+        try {
+            if (file.length() < 1024) { // Placeholder files are very small
+                val content = file.readText()
+                content.startsWith("# Placeholder for YouTube download:")
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            false
         }
 
     private fun extractEnhancedMetadata(file: File): Track {
