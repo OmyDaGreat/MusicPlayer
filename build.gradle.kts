@@ -45,7 +45,7 @@ dependencies {
     implementation("io.ktor:ktor-client-core:2.3.13")
     implementation("io.ktor:ktor-client-cio:2.3.12")
     implementation("io.ktor:ktor-client-content-negotiation:2.3.13")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.12")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.13")
 
     // JSON parsing - updated version
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
