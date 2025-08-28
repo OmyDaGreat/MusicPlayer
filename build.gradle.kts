@@ -42,7 +42,7 @@ dependencies {
     implementation("org.gagravarr:vorbis-java-core:0.8") // Ogg/Vorbis metadata
 
     // HTTP client for downloading - updated versions
-    implementation("io.ktor:ktor-client-core:2.3.13")
+    implementation("io.ktor:ktor-client-core:3.2.3")
     implementation("io.ktor:ktor-client-cio:2.3.12")
     implementation("io.ktor:ktor-client-content-negotiation:2.3.13")
     implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.12")
