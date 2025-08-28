@@ -110,9 +110,15 @@ class MusicManager {
             tracks
         }
 
-    private fun extractEnhancedMetadata(file: File): Track =
-        try {
-            // First try with JAudioTagger
+    private fun extractEnhancedMetadata(file: File): Track {
+        return try {
+            // Skip JAudioTagger for Opus files to avoid TagLib errors - go straight to fallback
+            if (file.extension.lowercase() == "opus") {
+                println("Skipping JAudioTagger for Opus file, using filename parsing: ${file.name}")
+                return extractOpusFallbackMetadata(file)
+            }
+
+            // First try with JAudioTagger for supported formats
             val audioFile = AudioFileIO.read(file)
             val tag = audioFile.tag
             val header = audioFile.audioHeader
@@ -197,12 +203,12 @@ class MusicManager {
                 }
             }
         }
+    }
 
     private fun extractOpusFallbackMetadata(file: File): Track {
         // For opus files, try to extract basic info from filename
-        // In a production app, you might use specialized opus libraries
         return try {
-            // Try to parse filename patterns like "Artist - Title.opus"
+            // Try to parse filename patterns like "Title - Artist.opus"
             val nameWithoutExt = file.nameWithoutExtension
             val parts = nameWithoutExt.split(" - ", limit = 2)
 
@@ -210,8 +216,8 @@ class MusicManager {
             val title: String
             when {
                 parts.size >= 2 -> {
-                    artist = parts[1]
-                    title = parts[0] // "Title - Artist" format
+                    title = parts[0] // First part is title
+                    artist = parts[1] // Second part is artist
                 }
                 nameWithoutExt.contains(" by ") -> {
                     val byParts = nameWithoutExt.split(" by ", limit = 2)
@@ -224,6 +230,9 @@ class MusicManager {
                 }
             }
 
+            // Try to find downloaded artwork for this track
+            val artworkPath = findDownloadedArtwork(title, artist)
+
             Track(
                 id = UUID.randomUUID().toString(),
                 title = title,
@@ -234,7 +243,7 @@ class MusicManager {
                 year = "",
                 genre = "",
                 trackNumber = 0,
-                artworkPath = null,
+                artworkPath = artworkPath,
             )
         } catch (e: Exception) {
             createFallbackTrack(file)
@@ -251,8 +260,8 @@ class MusicManager {
             val title: String
             when {
                 parts.size >= 2 -> {
-                    artist = parts[1]
-                    title = parts[0]
+                    title = parts[0] // First part is title
+                    artist = parts[1] // Second part is artist
                 }
                 nameWithoutExt.contains(" by ") -> {
                     val byParts = nameWithoutExt.split(" by ", limit = 2)
@@ -265,6 +274,9 @@ class MusicManager {
                 }
             }
 
+            // Try to find downloaded artwork for this track
+            val artworkPath = findDownloadedArtwork(title, artist)
+
             Track(
                 id = UUID.randomUUID().toString(),
                 title = title,
@@ -275,7 +287,7 @@ class MusicManager {
                 year = "",
                 genre = "",
                 trackNumber = 0,
-                artworkPath = null,
+                artworkPath = artworkPath,
             )
         } catch (e: Exception) {
             createFallbackTrack(file)
@@ -295,6 +307,37 @@ class MusicManager {
             trackNumber = 0,
             artworkPath = null,
         )
+
+    private fun findDownloadedArtwork(
+        title: String,
+        artist: String,
+    ): String? {
+        return try {
+            // Create safe filename components for artwork lookup
+            val safeTitle = title.replace("[^a-zA-Z0-9._-]".toRegex(), "_")
+            val safeArtist = artist.replace("[^a-zA-Z0-9._-]".toRegex(), "_")
+
+            // Try different artwork filename patterns
+            val patterns =
+                listOf(
+                    "${safeArtist}_$safeTitle.jpg",
+                    "${safeArtist}_$safeTitle.png",
+                    "${safeTitle}_$safeArtist.jpg",
+                    "${safeTitle}_$safeArtist.png",
+                )
+
+            for (pattern in patterns) {
+                val artworkFile = File(artworkDirectory, pattern)
+                if (artworkFile.exists()) {
+                    return artworkFile.absolutePath
+                }
+            }
+            null
+        } catch (e: Exception) {
+            println("Error finding downloaded artwork: ${e.message}")
+            null
+        }
+    }
 
     private fun extractAlbumArtwork(
         audioFile: File,

@@ -166,7 +166,8 @@ class DownloadManager {
 
                 // Note: In a real implementation, you would use yt-dlp or similar tool
                 // For now, we'll create a placeholder that could be extended
-                val fileName = "${searchResult.artist} - ${searchResult.title}".replace("[^a-zA-Z0-9 .-]".toRegex(), "")
+                // Use "Title - Artist" format to match the parsing logic in MusicManager
+                val fileName = "${searchResult.title} - ${searchResult.artist}".replace("[^a-zA-Z0-9 .-]".toRegex(), "")
                 val safeFileName = "$fileName.$selectedFormat"
                 val file = File(musicManager.downloadsDirectory, safeFileName)
 
