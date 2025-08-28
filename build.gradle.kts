@@ -55,7 +55,7 @@ dependencies {
     implementation("org.jsoup:jsoup:1.17.2")
 
     // File system operations - updated version
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.8.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.10.2")
 }
 
 compose.desktop {
