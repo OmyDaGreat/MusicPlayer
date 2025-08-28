@@ -100,185 +100,186 @@ fun MusicPlayerApp() {
     }
 
     MaterialTheme {
-        Row(modifier = Modifier.fillMaxSize()) {
-            // Sidebar - Playlists
-            Card(
-                modifier = Modifier.width(300.dp).fillMaxHeight(),
-                elevation = 4.dp,
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text("Playlists", style = MaterialTheme.typography.h6)
-                        Row {
-                            IconButton(onClick = { showNewPlaylistDialog = true }) {
-                                Icon(Icons.Default.Add, "New Playlist")
-                            }
-                            IconButton(onClick = { showDownloader = !showDownloader }) {
-                                Icon(Icons.Default.Download, "Downloads")
-                            }
-                        }
-                    }
-
-                    Divider(modifier = Modifier.padding(vertical = 8.dp))
-
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        val playlistScrollState = rememberLazyListState()
-                        LazyColumn(state = playlistScrollState) {
-                            items(playlists) { playlist ->
-                                Card(
-                                    modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
-                                    backgroundColor =
-                                        if (playlist == selectedPlaylist) {
-                                            MaterialTheme.colors.primary.copy(alpha = 0.1f)
-                                        } else {
-                                            MaterialTheme.colors.surface
-                                        },
-                                    onClick = {
-                                        selectedPlaylist = playlist
-                                        showDownloader = false
-                                        searchQuery = "" // Clear search when switching playlists
-                                    },
-                                ) {
-                                    Column(modifier = Modifier.padding(12.dp)) {
-                                        Text(
-                                            text = playlist.name,
-                                            style = MaterialTheme.typography.body1,
-                                        )
-                                        Text(
-                                            text = "${playlist.tracks.size} songs",
-                                            style = MaterialTheme.typography.caption,
-                                            color = Color.Gray,
-                                        )
-                                    }
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Main content area
+            Row(modifier = Modifier.weight(1f)) {
+                // Sidebar - Playlists
+                Card(
+                    modifier = Modifier.width(300.dp).fillMaxHeight(),
+                    elevation = 4.dp,
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text("Playlists", style = MaterialTheme.typography.h6)
+                            Row {
+                                IconButton(onClick = { showNewPlaylistDialog = true }) {
+                                    Icon(Icons.Default.Add, "New Playlist")
+                                }
+                                IconButton(onClick = { showDownloader = !showDownloader }) {
+                                    Icon(Icons.Default.Download, "Downloads")
                                 }
                             }
                         }
 
-                        VerticalScrollbar(
-                            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
-                            adapter = rememberScrollbarAdapter(scrollState = playlistScrollState),
-                        )
+                        Divider(modifier = Modifier.padding(vertical = 8.dp))
+
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            val playlistScrollState = rememberLazyListState()
+                            LazyColumn(state = playlistScrollState) {
+                                items(playlists) { playlist ->
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                                        backgroundColor =
+                                            if (playlist == selectedPlaylist) {
+                                                MaterialTheme.colors.primary.copy(alpha = 0.1f)
+                                            } else {
+                                                MaterialTheme.colors.surface
+                                            },
+                                        onClick = {
+                                            selectedPlaylist = playlist
+                                            showDownloader = false
+                                            searchQuery = "" // Clear search when switching playlists
+                                        },
+                                    ) {
+                                        Column(modifier = Modifier.padding(12.dp)) {
+                                            Text(
+                                                text = playlist.name,
+                                                style = MaterialTheme.typography.body1,
+                                            )
+                                            Text(
+                                                text = "${playlist.tracks.size} songs",
+                                                style = MaterialTheme.typography.caption,
+                                                color = Color.Gray,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            VerticalScrollbar(
+                                modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+                                adapter = rememberScrollbarAdapter(scrollState = playlistScrollState),
+                            )
+                        }
                     }
                 }
-            }
 
-            // Main Content
-            Column(
-                modifier = Modifier.weight(1f).fillMaxHeight().padding(20.dp),
-            ) {
-                if (showDownloader) {
-                    SearchDownloadScreen(
-                        musicManager = musicManager,
-                        onTrackDownloaded = {
-                            scope.launch {
-                                musicManager.scanMusicDirectory()
-                                playlists = musicManager.loadPlaylists()
-                            }
-                        },
-                    )
-                } else {
-                    selectedPlaylist?.let { playlist ->
-                        // Search bar
-                        OutlinedTextField(
-                            value = searchQuery,
-                            onValueChange = { searchQuery = it },
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
-                            placeholder = { Text("Search music...") },
-                            leadingIcon = { Icon(Icons.Default.Search, "Search") },
-                            trailingIcon = {
-                                if (searchQuery.isNotBlank()) {
-                                    IconButton(onClick = { searchQuery = "" }) {
-                                        Icon(Icons.Default.Clear, "Clear")
-                                    }
-                                }
-                            },
-                            singleLine = true,
-                        )
-
-                        PlaylistView(
-                            playlist = playlist,
-                            searchResults = if (searchQuery.isNotBlank()) searchResults else emptyList(),
-                            isSearching = isSearching,
-                            currentTrack = currentTrack,
-                            onTrackSelected = { track ->
-                                currentTrack = track
-                                scope.launch {
-                                    val tracksToPlay = if (searchQuery.isNotBlank()) searchResults else playlist.tracks
-                                    musicPlayer.playWithPlaylist(track, tracksToPlay)
-                                }
-                            },
-                            onRefreshMusic = {
+                // Main Content
+                Column(
+                    modifier = Modifier.weight(1f).fillMaxHeight().padding(20.dp),
+                ) {
+                    if (showDownloader) {
+                        SearchDownloadScreen(
+                            musicManager = musicManager,
+                            onTrackDownloaded = {
                                 scope.launch {
                                     musicManager.scanMusicDirectory()
                                     playlists = musicManager.loadPlaylists()
                                 }
                             },
                         )
+                    } else {
+                        selectedPlaylist?.let { playlist ->
+                            // Search bar
+                            OutlinedTextField(
+                                value = searchQuery,
+                                onValueChange = { searchQuery = it },
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
+                                placeholder = { Text("Search music...") },
+                                leadingIcon = { Icon(Icons.Default.Search, "Search") },
+                                trailingIcon = {
+                                    if (searchQuery.isNotBlank()) {
+                                        IconButton(onClick = { searchQuery = "" }) {
+                                            Icon(Icons.Default.Clear, "Clear")
+                                        }
+                                    }
+                                },
+                                singleLine = true,
+                            )
+
+                            PlaylistView(
+                                playlist = playlist,
+                                searchResults = if (searchQuery.isNotBlank()) searchResults else emptyList(),
+                                isSearching = isSearching,
+                                currentTrack = currentTrack,
+                                onTrackSelected = { track ->
+                                    currentTrack = track
+                                    scope.launch {
+                                        val tracksToPlay = if (searchQuery.isNotBlank()) searchResults else playlist.tracks
+                                        musicPlayer.playWithPlaylist(track, tracksToPlay)
+                                    }
+                                },
+                                onRefreshMusic = {
+                                    scope.launch {
+                                        musicManager.scanMusicDirectory()
+                                        playlists = musicManager.loadPlaylists()
+                                    }
+                                },
+                            )
+                        }
                     }
                 }
+            }
 
-                Spacer(modifier = Modifier.weight(1f))
-
-                // Player Controls at Bottom
-                PlayerControls(
-                    currentTrack = currentTrack,
-                    isPlaying = isPlaying,
-                    currentPosition = currentPosition,
-                    duration = duration,
-                    volume = volume,
-                    isShuffleEnabled = isShuffleEnabled,
-                    repeatMode = repeatMode,
-                    onPlayPause = {
-                        scope.launch {
-                            if (isPlaying) {
-                                musicPlayer.pause()
-                            } else {
-                                currentTrack?.let {
-                                    if (musicPlayer.currentTrack.value == it) {
-                                        musicPlayer.resume()
-                                    } else {
-                                        musicPlayer.play(it)
-                                    }
+            // Player Controls at Bottom - Always visible across all screens
+            PlayerControls(
+                currentTrack = currentTrack,
+                isPlaying = isPlaying,
+                currentPosition = currentPosition,
+                duration = duration,
+                volume = volume,
+                isShuffleEnabled = isShuffleEnabled,
+                repeatMode = repeatMode,
+                onPlayPause = {
+                    scope.launch {
+                        if (isPlaying) {
+                            musicPlayer.pause()
+                        } else {
+                            currentTrack?.let {
+                                if (musicPlayer.currentTrack.value == it) {
+                                    musicPlayer.resume()
+                                } else {
+                                    musicPlayer.play(it)
                                 }
                             }
                         }
-                    },
-                    onPrevious = {
-                        selectedPlaylist?.let { playlist ->
-                            val prevTrack = musicPlayer.previousTrack()
-                            prevTrack?.let {
-                                currentTrack = it
-                                scope.launch { musicPlayer.play(it) }
-                            }
+                    }
+                },
+                onPrevious = {
+                    selectedPlaylist?.let { playlist ->
+                        val prevTrack = musicPlayer.previousTrack()
+                        prevTrack?.let {
+                            currentTrack = it
+                            scope.launch { musicPlayer.play(it) }
                         }
-                    },
-                    onNext = {
-                        selectedPlaylist?.let { playlist ->
-                            val nextTrack = musicPlayer.nextTrack()
-                            nextTrack?.let {
-                                currentTrack = it
-                                scope.launch { musicPlayer.play(it) }
-                            }
+                    }
+                },
+                onNext = {
+                    selectedPlaylist?.let { playlist ->
+                        val nextTrack = musicPlayer.nextTrack()
+                        nextTrack?.let {
+                            currentTrack = it
+                            scope.launch { musicPlayer.play(it) }
                         }
-                    },
-                    onSeek = { positionSeconds ->
-                        musicPlayer.seek(positionSeconds)
-                    },
-                    onVolumeChanged = { newVolume ->
-                        musicPlayer.setVolume(newVolume)
-                    },
-                    onShuffleToggle = {
-                        musicPlayer.toggleShuffle()
-                    },
-                    onRepeatToggle = {
-                        musicPlayer.toggleRepeatMode()
-                    },
-                )
-            }
+                    }
+                },
+                onSeek = { positionSeconds ->
+                    musicPlayer.seek(positionSeconds)
+                },
+                onVolumeChanged = { newVolume ->
+                    musicPlayer.setVolume(newVolume)
+                },
+                onShuffleToggle = {
+                    musicPlayer.toggleShuffle()
+                },
+                onRepeatToggle = {
+                    musicPlayer.toggleRepeatMode()
+                },
+            )
         }
 
         // New Playlist Dialog

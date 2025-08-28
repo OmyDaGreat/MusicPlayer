@@ -27,6 +27,10 @@ data class SearchResult(
     val thumbnail: String,
 )
 
+class YtDlpNotInstalledException(
+    message: String,
+) : Exception(message)
+
 class DownloadManager {
     private val client =
         HttpClient(CIO) {
@@ -171,15 +175,11 @@ class DownloadManager {
                 // Download thumbnail as artwork first
                 val artworkPath = downloadThumbnail(searchResult)
 
-                // Try to download with yt-dlp first, fall back to placeholder
+                // Try to download with yt-dlp - throw exception if not available
                 val success = downloadWithYtDlp(file, searchResult, format)
 
                 if (!success) {
-                    // Create placeholder file for compatibility
-                    file.writeText(
-                        "# Placeholder for YouTube download: ${searchResult.videoId}\n# Audio would be downloaded from: https://youtube.com/watch?v=${searchResult.videoId}\n# Format: MP3",
-                    )
-                    println("Created placeholder file for ${searchResult.title} - real download not available")
+                    throw YtDlpNotInstalledException("yt-dlp is not installed. Please install yt-dlp to download music from YouTube.")
                 }
 
                 val track =
@@ -287,6 +287,7 @@ class DownloadManager {
                 false
             } catch (e: Exception) {
                 println("Error running yt-dlp: ${e.message}")
+                // If we can't even execute the command, it's likely not installed
                 false
             }
         }

@@ -28,6 +28,7 @@ import kotlinx.coroutines.withContext
 import xyz.malefic.compose.util.DownloadManager
 import xyz.malefic.compose.util.MusicManager
 import xyz.malefic.compose.util.SearchResult
+import xyz.malefic.compose.util.YtDlpNotInstalledException
 import java.awt.image.BufferedImage
 import java.io.ByteArrayInputStream
 import javax.imageio.ImageIO
@@ -45,6 +46,7 @@ fun SearchDownloadScreen(
     var isSearching by remember { mutableStateOf(false) }
     var downloadingItems by remember { mutableStateOf<Set<String>>(emptySet()) }
     var downloadStatus by remember { mutableStateOf<String?>(null) }
+    var showYtDlpWarning by remember { mutableStateOf(false) }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -172,6 +174,9 @@ fun SearchDownloadScreen(
                                     downloadManager.downloadFromYouTube(result)
                                     downloadStatus = "Downloaded: ${result.title}"
                                     onTrackDownloaded()
+                                } catch (e: YtDlpNotInstalledException) {
+                                    downloadStatus = null
+                                    showYtDlpWarning = true
                                 } catch (e: Exception) {
                                     downloadStatus = "Download failed: ${e.message}"
                                 } finally {
@@ -216,6 +221,52 @@ fun SearchDownloadScreen(
                 }
             }
         }
+    }
+
+    // yt-dlp Installation Warning Dialog
+    if (showYtDlpWarning) {
+        AlertDialog(
+            onDismissRequest = { showYtDlpWarning = false },
+            title = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        Icons.Default.Warning,
+                        contentDescription = "Warning",
+                        tint = MaterialTheme.colors.error,
+                        modifier = Modifier.size(24.dp),
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("yt-dlp Not Installed")
+                }
+            },
+            text = {
+                Column {
+                    Text("yt-dlp is required to download music from YouTube. Please install it to continue.")
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        "Installation instructions:",
+                        style = MaterialTheme.typography.subtitle2,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "• Windows: Download from github.com/yt-dlp/yt-dlp/releases\n" +
+                            "• macOS: brew install yt-dlp\n" +
+                            "• Linux: pip install yt-dlp",
+                        style = MaterialTheme.typography.body2,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { showYtDlpWarning = false },
+                ) {
+                    Text("OK")
+                }
+            },
+        )
     }
 }
 
