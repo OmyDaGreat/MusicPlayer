@@ -28,7 +28,7 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended:1.7.8")
 
     // VLCJ for enhanced audio format support (Opus, M4A, etc.)
-    implementation("uk.co.caprica:vlcj:4.8.2")
+    implementation("uk.co.caprica:vlcj:4.11.0")
     implementation("net.java.dev.jna:jna:5.14.0")
     implementation("net.java.dev.jna:jna-platform:5.14.0")
 
