@@ -30,7 +30,7 @@ dependencies {
     // VLCJ for enhanced audio format support (Opus, M4A, etc.)
     implementation("uk.co.caprica:vlcj:4.8.2")
     implementation("net.java.dev.jna:jna:5.14.0")
-    implementation("net.java.dev.jna:jna-platform:5.14.0")
+    implementation("net.java.dev.jna:jna-platform:5.17.0")
 
     // Enhanced metadata extraction and artwork support
     implementation("org:jaudiotagger:2.0.3") // Use available version
