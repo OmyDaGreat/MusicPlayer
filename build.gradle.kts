@@ -52,7 +52,7 @@ dependencies {
 
     // YouTube search and download capabilities
     implementation("org.json:json:20240303")
-    implementation("org.jsoup:jsoup:1.17.2")
+    implementation("org.jsoup:jsoup:1.21.2")
 
     // File system operations - updated version
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.10.2")
