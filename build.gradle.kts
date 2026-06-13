@@ -29,7 +29,7 @@ dependencies {
 
     // VLCJ for enhanced audio format support (Opus, M4A, etc.)
     implementation("uk.co.caprica:vlcj:4.8.2")
-    implementation("net.java.dev.jna:jna:5.14.0")
+    implementation("net.java.dev.jna:jna:5.19.1")
     implementation("net.java.dev.jna:jna-platform:5.14.0")
 
     // Enhanced metadata extraction and artwork support
